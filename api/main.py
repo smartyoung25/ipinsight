@@ -13,11 +13,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.schemas import StageRequest, PipelineRequest, FundingMatchRequest
 from pipeline.phase_gate_pipeline import PhaseGatePipeline, STAGE_NAMES
 from pipeline.funding_matcher import match_funding, recommend_funding_sequence
+from agents import (
+    IDFGenerator, PatentPortfolioStrategist, PatentabilityAssessor,
+    GlobalIPStrategist, CompetitiveMonitor, PortfolioOptimizer,
+)
 
 app = FastAPI(
-    title="IPInsight 글로벌 기술사업화 Agent OS",
-    description="G0~G10 전주기 기술사업화 프로세스 자동화 — WIPO·TRL·I-Corps·ARL·MRL 통합",
-    version="1.0.0",
+    title="IPInsight IP Lifecycle × 글로벌 기술사업화 OS",
+    description="G0~G10 전주기 + 4단계 IP 라이프사이클 통합 — WIPO·TRL·I-Corps·ARL·MRL·포트폴리오",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -123,6 +127,79 @@ def funding_sequence(trl_current: int, trl_target: int, country: str = ""):
     """TRL 현재→목표 달성을 위한 단계별 자금조달 시퀀스"""
     sequence = recommend_funding_sequence(trl_current, trl_target, country)
     return {"trl_current": trl_current, "trl_target": trl_target, "sequence": sequence}
+
+
+@app.post("/ip/idf")
+def generate_idf(req: StageRequest):
+    """발명공개서(IDF) 생성 — 1단계 IP개발"""
+    try:
+        result = IDFGenerator().assess(req.input_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"tech_id": req.tech_id, "stage": "G0-IDF", "result": result.to_dict()}
+
+
+@app.post("/ip/portfolio")
+def build_portfolio_strategy(req: StageRequest):
+    """특허 포트폴리오 구성 전략 — 1단계 IP개발"""
+    try:
+        result = PatentPortfolioStrategist().assess(req.input_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"tech_id": req.tech_id, "stage": "G1-Portfolio", "result": result.to_dict()}
+
+
+@app.post("/ip/patentability")
+def assess_patentability(req: StageRequest):
+    """권리성 심화 평가 — 2단계 IP평가"""
+    try:
+        result = PatentabilityAssessor().assess(req.input_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"tech_id": req.tech_id, "stage": "G2-Patent", "result": result.to_dict()}
+
+
+@app.post("/ip/global-strategy")
+def global_ip_strategy(req: StageRequest):
+    """글로벌 IP 출원 전략 — 4단계 IP전략"""
+    try:
+        result = GlobalIPStrategist().assess(req.input_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"tech_id": req.tech_id, "stage": "G10-Global", "result": result.to_dict()}
+
+
+@app.post("/ip/competitive")
+def competitive_response(req: StageRequest):
+    """경쟁대응 전략 — 4단계 IP전략"""
+    try:
+        result = CompetitiveMonitor().assess(req.input_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"tech_id": req.tech_id, "stage": "G10-Competitive", "result": result.to_dict()}
+
+
+@app.post("/ip/portfolio-optimize")
+def optimize_portfolio(req: StageRequest):
+    """IP 포트폴리오 최적화 — 4단계 IP전략"""
+    try:
+        result = PortfolioOptimizer().assess(req.input_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"tech_id": req.tech_id, "stage": "G10-Portfolio", "result": result.to_dict()}
+
+
+@app.get("/ip/stages")
+def list_ip_stages():
+    """IP Lifecycle 확장 단계 목록"""
+    return {
+        "ip_lifecycle_phases": [
+            {"phase": 1, "name": "IP개발", "stages": ["G0", "G0-IDF", "G1", "G1-Portfolio"]},
+            {"phase": 2, "name": "IP평가", "stages": ["G2", "G2-Patent", "G3", "G6", "G8"]},
+            {"phase": 3, "name": "IP활용", "stages": ["G4", "G5", "G7", "G9"]},
+            {"phase": 4, "name": "IP전략", "stages": ["G10", "G10-Global", "G10-Competitive", "G10-Portfolio"]},
+        ]
+    }
 
 
 @app.get("/demo/sample-input")

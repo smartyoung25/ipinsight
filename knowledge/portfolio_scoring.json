@@ -1,0 +1,69 @@
+{
+  "description": "IP 포트폴리오 평가 기준 — 성장성·방어력·수익성 3축 (PortfolioOptimizer 활용)",
+  "last_updated": "2026-06",
+  "scoring_axes": {
+    "growth": {
+      "name": "성장성",
+      "weight_pct": 35,
+      "indicators": [
+        {"name": "목표 시장 성장률 (CAGR)", "score_5": "≥20%", "score_3": "10~20%", "score_1": "<5%"},
+        {"name": "TRL 진전 속도 (연간 +단계)", "score_5": "≥2단계", "score_3": "1단계", "score_1": "정체"},
+        {"name": "신규 청구항 추가 건수/년", "score_5": "≥3건", "score_3": "1~2건", "score_1": "0건"},
+        {"name": "PoC 파이프라인 (G7 진행 수)", "score_5": "≥3건", "score_3": "1~2건", "score_1": "0건"}
+      ]
+    },
+    "defense": {
+      "name": "방어력",
+      "weight_pct": 35,
+      "indicators": [
+        {"name": "독립청구항 수", "score_5": "≥5개", "score_3": "3~4개", "score_1": "<3개"},
+        {"name": "특허 잔존 수명", "score_5": "≥15년", "score_3": "8~15년", "score_1": "<5년"},
+        {"name": "FTO 리스크 수준", "score_5": "Low", "score_3": "Medium", "score_1": "High"},
+        {"name": "경쟁사 회피 난이도", "score_5": "불가능", "score_3": "어려움", "score_1": "쉬움"}
+      ]
+    },
+    "profitability": {
+      "name": "수익성",
+      "weight_pct": 30,
+      "indicators": [
+        {"name": "IP ROI (수익/비용)", "score_5": "≥300%", "score_3": "100~300%", "score_1": "<50%"},
+        {"name": "라이선싱 수익 비중", "score_5": "≥30%", "score_3": "10~30%", "score_1": "<5%"},
+        {"name": "연간 IP 유지비용", "score_5": "<$10k", "score_3": "$10~50k", "score_1": ">$100k"},
+        {"name": "상업화 실적 (Go-to-Market)", "score_5": "매출 발생", "score_3": "LoI 체결", "score_1": "미진행"}
+      ]
+    }
+  },
+  "bcg_matrix_thresholds": {
+    "high_growth_pct": 10,
+    "strong_competitive_positions": ["strong"],
+    "weak_competitive_positions": ["medium", "weak"]
+  },
+  "health_benchmarks": {
+    "portfolio_roi_healthy_pct": 200,
+    "portfolio_roi_critical_pct": 50,
+    "avg_patent_life_healthy_years": 10,
+    "avg_patent_life_critical_years": 5,
+    "licensing_share_healthy_pct": 20,
+    "licensing_share_critical_pct": 5,
+    "new_ip_per_year_healthy": 5,
+    "new_ip_per_year_critical": 2
+  },
+  "divestment_criteria": {
+    "trigger": "BCG Dog 분류 + ROI <50% + 특허잔존 <3년 중 2개 이상 해당",
+    "options": [
+      "IP 기술이전 (Technology Transfer) — 일시금 수령",
+      "비독점 라이선스 후 폐기 — 잔여 수익 확보",
+      "방어적 공개 (Defensive Publication) — 타인 출원 차단 후 공개",
+      "IP 매각 — 특허 거래 플랫폼(IPwe, Ocean Tomo) 활용"
+    ]
+  },
+  "investment_criteria": {
+    "trigger": "BCG Star 분류 + ROI >200% + 시장성장률 >15%",
+    "options": [
+      "추가 클레임 보강 출원",
+      "글로벌 확장 출원 (PCT)",
+      "연속 특허(Continuation) 전략으로 보호 범위 확장",
+      "관련 기술 M&A 또는 라이선스 도입으로 포트폴리오 보강"
+    ]
+  }
+}

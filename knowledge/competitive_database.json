@@ -1,0 +1,108 @@
+{
+  "description": "분야별 경쟁특허 패턴 템플릿 — CompetitiveMonitor 활용",
+  "last_updated": "2026-06",
+  "response_actions": {
+    "design_around": {
+      "name": "회피설계 (Design-Around)",
+      "desc": "경쟁사 청구항 분석 → 구성요소 치환·삭제·추가로 비침해 설계",
+      "cost_usd_range": [50000, 500000],
+      "timeline_months": [3, 12],
+      "success_rate_pct": 70,
+      "when_to_use": "경쟁사 특허 overlap_risk=high·medium이고 자사 R&D 역량 보유 시"
+    },
+    "invalidity": {
+      "name": "무효심판 (IPR / 無效審判)",
+      "desc": "선행기술 발굴로 경쟁사 특허 등록 무효 청구",
+      "cost_usd_range": [50000, 500000],
+      "timeline_months": [12, 36],
+      "success_rate_pct": 60,
+      "when_to_use": "경쟁사 핵심 특허 overlap_risk=critical이고 자사 IP 강도 ≥70 시"
+    },
+    "license_in": {
+      "name": "라이선스 도입 (License-In)",
+      "desc": "경쟁사에 로열티 지불하고 실시권 확보",
+      "cost_usd_range": [10000, 200000],
+      "timeline_months": [3, 6],
+      "success_rate_pct": 80,
+      "when_to_use": "회피설계 비용 > 로열티 NPV 시. 단기 시장 진입 급할 때"
+    },
+    "cross_license": {
+      "name": "크로스 라이선스",
+      "desc": "자사 IP와 경쟁사 IP 상호 교환 — 현금 없이 실시권 확보",
+      "cost_usd_range": [5000, 50000],
+      "timeline_months": [6, 12],
+      "success_rate_pct": 65,
+      "when_to_use": "양사 IP 포트폴리오 규모 유사하고 기술 보완 관계 시"
+    },
+    "patent_pool": {
+      "name": "특허 풀 참여",
+      "desc": "업계 공동 특허 풀 가입 → 포괄적 실시권 확보",
+      "cost_usd_range": [5000, 100000],
+      "timeline_months": [1, 3],
+      "success_rate_pct": 90,
+      "when_to_use": "표준화(FRAND) 기술 분야 또는 DVD·HEVC 등 기존 풀 존재 시"
+    },
+    "monitor_only": {
+      "name": "모니터링 지속",
+      "desc": "직접 충돌 없음 — 분기별 경쟁사 출원 동향 추적",
+      "cost_usd_range": [1000, 10000],
+      "timeline_months": [1, 1],
+      "success_rate_pct": 100,
+      "when_to_use": "overlap_risk=low이거나 기술 방향만 유사하고 청구항 충돌 없음 시"
+    }
+  },
+  "sector_competitive_patterns": [
+    {
+      "sector": "AI·소프트웨어",
+      "avg_competitor_patents": 500,
+      "fto_risk_default": "medium",
+      "key_claim_types": ["방법 청구항", "시스템 청구항", "CRM 청구항"],
+      "common_invalidity_grounds": ["선행 논문", "오픈소스 코드", "학회 발표"],
+      "typical_royalty_pct": [1, 5],
+      "watch_assignees": ["IBM", "Microsoft", "Google", "Meta", "Amazon"]
+    },
+    {
+      "sector": "바이오·의료기기",
+      "avg_competitor_patents": 200,
+      "fto_risk_default": "high",
+      "key_claim_types": ["조성물 청구항", "방법 청구항", "용도 청구항"],
+      "common_invalidity_grounds": ["임상논문", "FDA 데이터", "식물 추출물 선행기술"],
+      "typical_royalty_pct": [3, 15],
+      "watch_assignees": ["Medtronic", "Abbott", "Roche", "Pfizer", "J&J"]
+    },
+    {
+      "sector": "반도체·전자",
+      "avg_competitor_patents": 3000,
+      "fto_risk_default": "high",
+      "key_claim_types": ["구조 청구항", "공정 청구항", "회로 청구항"],
+      "common_invalidity_grounds": ["IEEE 논문", "칩 데이터시트", "표준 문서"],
+      "typical_royalty_pct": [1, 6],
+      "watch_assignees": ["Samsung", "TSMC", "Intel", "Qualcomm", "ASML"]
+    },
+    {
+      "sector": "스마트팜·애그테크",
+      "avg_competitor_patents": 80,
+      "fto_risk_default": "low",
+      "key_claim_types": ["시스템 청구항", "방법 청구항", "센서 구성 청구항"],
+      "common_invalidity_grounds": ["농진청 연구보고서", "대학 논문", "USDA 자료"],
+      "typical_royalty_pct": [2, 7],
+      "watch_assignees": ["John Deere", "Trimble", "Priva", "AgriForce", "The Climate Corporation"]
+    },
+    {
+      "sector": "클린테크·에너지",
+      "avg_competitor_patents": 300,
+      "fto_risk_default": "medium",
+      "key_claim_types": ["소재 청구항", "공정 청구항", "시스템 청구항"],
+      "common_invalidity_grounds": ["DOE 보고서", "IEA 데이터", "특허 출원 선행"],
+      "typical_royalty_pct": [2, 8],
+      "watch_assignees": ["Tesla", "Siemens Energy", "GE Vernova", "Vestas", "CATL"]
+    }
+  ],
+  "monitoring_tools": [
+    {"name": "Google Patents", "cost": "무료", "coverage": "전세계", "strength": "검색 편의성"},
+    {"name": "Derwent Innovation", "cost": "유료 ($30k+/년)", "coverage": "전세계", "strength": "분석·경보"},
+    {"name": "PatSnap", "cost": "유료 ($15k+/년)", "coverage": "전세계", "strength": "AI 분석"},
+    {"name": "KIPRIS", "cost": "무료 (한국)", "coverage": "한국·PCT", "strength": "한국어"},
+    {"name": "Espacenet", "cost": "무료 (EPO)", "coverage": "유럽+PCT", "strength": "유럽 특화"}
+  ]
+}

@@ -1,0 +1,216 @@
+{
+  "description": "주요 10개국 시장환경·IP강도·규제 기초 데이터 (GlobalIPStrategist 활용)",
+  "last_updated": "2026-06",
+  "countries": [
+    {
+      "code": "USA",
+      "name": "미국",
+      "region": "북미",
+      "gdp_usd_bn": 27360,
+      "ip_environment": {
+        "ip_score": 90,
+        "patent_system": "선발명주의 → AIA(2013) 선출원주의 전환",
+        "enforcement": "매우 강함 (ITC·USDC·PTAB)",
+        "avg_grant_months": 24,
+        "annual_filing_count": 650000
+      },
+      "market_attractiveness": {
+        "tier": 1,
+        "vc_ecosystem": "매우 발달 (실리콘밸리·보스턴·뉴욕)",
+        "tech_sectors": ["AI", "반도체", "바이오", "클린테크", "SaaS"],
+        "regulatory_burden": "중간"
+      },
+      "key_certifications": ["FDA 510(k)", "FCC", "UL", "ISO"],
+      "filing_cost_usd": 12000
+    },
+    {
+      "code": "EU",
+      "name": "유럽연합 (EPO)",
+      "region": "유럽",
+      "gdp_usd_bn": 18350,
+      "ip_environment": {
+        "ip_score": 85,
+        "patent_system": "EPO 유럽 특허 + UPC(2023 단일 특허법원)",
+        "enforcement": "강함 (UPC 이후 통합 집행)",
+        "avg_grant_months": 36,
+        "annual_filing_count": 193000
+      },
+      "market_attractiveness": {
+        "tier": 1,
+        "vc_ecosystem": "발달 (베를린·런던·파리·스톡홀름)",
+        "tech_sectors": ["그린테크", "모빌리티", "헬스케어", "스마트팜"],
+        "regulatory_burden": "높음 (GDPR·CE 등)"
+      },
+      "key_certifications": ["CE Mark", "ISO 9001", "REACH", "MDR"],
+      "filing_cost_usd": 15000
+    },
+    {
+      "code": "CHN",
+      "name": "중국",
+      "region": "동아시아",
+      "gdp_usd_bn": 17790,
+      "ip_environment": {
+        "ip_score": 65,
+        "patent_system": "발명특허·실용신안·디자인 3원 체계",
+        "enforcement": "개선 중 (지식재산법원 설립)",
+        "avg_grant_months": 18,
+        "annual_filing_count": 1580000
+      },
+      "market_attractiveness": {
+        "tier": 1,
+        "vc_ecosystem": "발달 (베이징·상하이·선전)",
+        "tech_sectors": ["AI", "전기차", "반도체", "5G", "스마트팜"],
+        "regulatory_burden": "높음 (데이터현지화·외자규제)"
+      },
+      "key_certifications": ["CCC", "NMPA", "SAMR"],
+      "filing_cost_usd": 5000
+    },
+    {
+      "code": "JPN",
+      "name": "일본",
+      "region": "동아시아",
+      "gdp_usd_bn": 4213,
+      "ip_environment": {
+        "ip_score": 80,
+        "patent_system": "선출원주의, 심사청구제",
+        "enforcement": "강함 (지적재산고등재판소)",
+        "avg_grant_months": 20,
+        "annual_filing_count": 289000
+      },
+      "market_attractiveness": {
+        "tier": 2,
+        "vc_ecosystem": "발달 (도쿄·오사카)",
+        "tech_sectors": ["로보틱스", "반도체 소재", "정밀기기", "스마트팜"],
+        "regulatory_burden": "중간"
+      },
+      "key_certifications": ["PMDA (의료기기)", "PSE", "JIS"],
+      "filing_cost_usd": 8000
+    },
+    {
+      "code": "KOR",
+      "name": "한국",
+      "region": "동아시아",
+      "gdp_usd_bn": 1713,
+      "ip_environment": {
+        "ip_score": 78,
+        "patent_system": "선출원주의, 심사청구제 (KR 특허청)",
+        "enforcement": "강함 (특허법원)",
+        "avg_grant_months": 14,
+        "annual_filing_count": 237000
+      },
+      "market_attractiveness": {
+        "tier": 2,
+        "vc_ecosystem": "발달 (서울·판교)",
+        "tech_sectors": ["반도체", "디스플레이", "AI", "스마트팜", "바이오"],
+        "regulatory_burden": "중간"
+      },
+      "key_certifications": ["KC인증", "식품의약품안전처(MFDS)", "KOSHA"],
+      "filing_cost_usd": 3000
+    },
+    {
+      "code": "SGP",
+      "name": "싱가포르",
+      "region": "동남아시아",
+      "gdp_usd_bn": 516,
+      "ip_environment": {
+        "ip_score": 82,
+        "patent_system": "영미법 기반, IPOS (지식재산청)",
+        "enforcement": "강함",
+        "avg_grant_months": 24,
+        "annual_filing_count": 10000
+      },
+      "market_attractiveness": {
+        "tier": 3,
+        "vc_ecosystem": "발달 (ASEAN 허브)",
+        "tech_sectors": ["핀테크", "생명공학", "스마트시티", "애그테크"],
+        "regulatory_burden": "낮음"
+      },
+      "key_certifications": ["HSA (의약품)", "CAAS (항공)", "EMA"],
+      "filing_cost_usd": 4000
+    },
+    {
+      "code": "ISR",
+      "name": "이스라엘",
+      "region": "중동",
+      "gdp_usd_bn": 521,
+      "ip_environment": {
+        "ip_score": 75,
+        "patent_system": "선출원주의, IL 특허청",
+        "enforcement": "강함",
+        "avg_grant_months": 30,
+        "annual_filing_count": 9500
+      },
+      "market_attractiveness": {
+        "tier": 3,
+        "vc_ecosystem": "매우 발달 (스타트업 네이션, Yozma 모델)",
+        "tech_sectors": ["사이버보안", "AgriTech", "의료기기", "AI·딥테크"],
+        "regulatory_burden": "중간"
+      },
+      "key_certifications": ["MOH (보건부)", "ICTS"],
+      "filing_cost_usd": 4500
+    },
+    {
+      "code": "IND",
+      "name": "인도",
+      "region": "남아시아",
+      "gdp_usd_bn": 3570,
+      "ip_environment": {
+        "ip_score": 55,
+        "patent_system": "영국법 기반, IPO (인도 특허청)",
+        "enforcement": "보통 (개선 중)",
+        "avg_grant_months": 48,
+        "annual_filing_count": 62000
+      },
+      "market_attractiveness": {
+        "tier": 2,
+        "vc_ecosystem": "성장 중 (벵갈루루·뭄바이·델리)",
+        "tech_sectors": ["IT서비스", "애그테크", "헬스테크", "핀테크"],
+        "regulatory_burden": "높음"
+      },
+      "key_certifications": ["BIS", "CDSCO (의약품)", "AERB"],
+      "filing_cost_usd": 3000
+    },
+    {
+      "code": "AUS",
+      "name": "호주",
+      "region": "오세아니아",
+      "gdp_usd_bn": 1723,
+      "ip_environment": {
+        "ip_score": 78,
+        "patent_system": "영미법 기반, IP Australia",
+        "enforcement": "강함",
+        "avg_grant_months": 24,
+        "annual_filing_count": 29000
+      },
+      "market_attractiveness": {
+        "tier": 3,
+        "vc_ecosystem": "발달 (시드니·멜버른)",
+        "tech_sectors": ["광업·자원", "AgriTech", "헬스케어", "클린에너지"],
+        "regulatory_burden": "중간"
+      },
+      "key_certifications": ["TGA (의료기기)", "RCM", "ACMA"],
+      "filing_cost_usd": 6000
+    },
+    {
+      "code": "CAN",
+      "name": "캐나다",
+      "region": "북미",
+      "gdp_usd_bn": 2140,
+      "ip_environment": {
+        "ip_score": 76,
+        "patent_system": "영미법 기반, CIPO",
+        "enforcement": "강함",
+        "avg_grant_months": 30,
+        "annual_filing_count": 36000
+      },
+      "market_attractiveness": {
+        "tier": 3,
+        "vc_ecosystem": "발달 (토론토·밴쿠버·몬트리올)",
+        "tech_sectors": ["AI", "클린테크", "광업", "바이오"],
+        "regulatory_burden": "중간"
+      },
+      "key_certifications": ["Health Canada", "ISED", "CSA"],
+      "filing_cost_usd": 7000
+    }
+  ]
+}
