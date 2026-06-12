@@ -1,6 +1,17 @@
-"""G7 PoC·실증·위험저감 — Catapult Network·Fraunhofer 응용연구 모델"""
+"""G7 PoC·실증·위험저감 — Catapult Network·Fraunhofer·Venture Client 모델"""
 from __future__ import annotations
 from .base_agent import BaseAgent, StageResult
+
+# Venture Client Model (BMW i Ventures 벤치마킹):
+# 기업이 스타트업의 첫 번째 고객이 되어 PoC 비용을 직접 부담.
+# → 스타트업은 매출+레퍼런스, 기업은 위험 없이 기술 검증.
+_VENTURE_CLIENT_TEMPLATE = {
+    "model": "Venture Client",
+    "how": "파트너 기업이 PoC 비용 부담 + 구매의향서(LoI) 사전 체결",
+    "benefit": "기술기업 매출+레퍼런스 동시 확보, 기업 측 지분 위험 없음",
+    "typical_duration_months": 3,
+    "criteria": ["기업 내 챔피언(실무추진자) 확보", "파일럿 예산 승인", "성공지표(KPI) 사전 합의"],
+}
 
 
 class PoCManager(BaseAgent):
@@ -11,7 +22,8 @@ class PoCManager(BaseAgent):
         """
         input_data: tech_name, poc_objectives (list), poc_kpis (list of {name, target, actual}),
                     test_environment, customer_feedback (list), issues_found (list),
-                    risk_mitigations (list), poc_duration_months
+                    risk_mitigations (list), poc_duration_months,
+                    venture_client_partner (str, optional): Venture Client 기업명
         """
         score = self._score(input_data)
         gate = self._gate_from_score(score)
@@ -72,12 +84,17 @@ class PoCManager(BaseAgent):
         except Exception:
             analysis = {"commercialization_readiness": "medium", "improvement_roadmap": []}
 
+        # Venture Client 옵션
+        vc_partner = d.get("venture_client_partner", "")
+        venture_client_plan = {**_VENTURE_CLIENT_TEMPLATE, "partner": vc_partner} if vc_partner else None
+
         return {
             "poc_plan": {
                 "tech_name": d.get("tech_name", ""),
                 "objectives": d.get("poc_objectives", []),
                 "test_environment": d.get("test_environment", ""),
                 "duration_months": d.get("poc_duration_months", 0),
+                "venture_client": venture_client_plan,
             },
             "poc_kpi_report": kpi_results,
             "performance_result": {

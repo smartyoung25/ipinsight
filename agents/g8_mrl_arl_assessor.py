@@ -1,6 +1,17 @@
-"""G8 MRL·ARL 3중 성숙도 평가 — DoD MRL + DOE ARL"""
+"""G8 MRL·ARL 3중 성숙도 평가 — DoD MRL + DOE ARL + NIST MEP"""
 from __future__ import annotations
 from .base_agent import BaseAgent, StageResult
+
+# NIST MEP (Manufacturing Extension Partnership) 벤치마킹:
+# 중소 제조업체 대상 공정개선·원가절감 체크리스트 (TRL 7~9 빠른 양산 진입)
+_NIST_MEP_CHECKLIST = [
+    {"item": "린(Lean) 제조 프로세스 적용", "mrl_impact": "+1"},
+    {"item": "공급망 2~3개 이중화 확보", "mrl_impact": "+1"},
+    {"item": "ISO 9001 또는 AS9100 품질시스템", "mrl_impact": "+1"},
+    {"item": "단위 생산원가 < 목표가의 1.5배", "mrl_impact": "+1"},
+    {"item": "초기 양산 50단위 이상 완료", "mrl_impact": "+2"},
+    {"item": "불량률 < 2% (Six Sigma 3σ)", "mrl_impact": "+1"},
+]
 
 
 class MRLARLAssessor(BaseAgent):
@@ -76,6 +87,11 @@ class MRLARLAssessor(BaseAgent):
                 "gap": cert_gap,
                 "regulatory_paths": reg_paths,
                 "total_cert_months": sum(r["duration_months"] for r in reg_paths),
+            },
+            "nist_mep_checklist": {
+                "items": _NIST_MEP_CHECKLIST,
+                "note": "NIST MEP 기준: 중소 제조업체 TRL 7~9 빠른 양산 진입 체크리스트",
+                "applicable": input_data.get("mrl_target", 8) >= 7,
             },
         }
 

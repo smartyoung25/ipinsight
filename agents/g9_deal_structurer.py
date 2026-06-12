@@ -1,6 +1,16 @@
-"""G9 거래·투자·사업화 방식 결정 — TLO 라이선싱·SBIR·EIC 투자연계"""
+"""G9 거래·투자·사업화 방식 결정 — TLO 라이선싱·SBIR·EIC·FLC/CRADA 투자연계"""
 from __future__ import annotations
 from .base_agent import BaseAgent, StageResult
+
+# FLC Federal Lab Consortium (미국 국립연구소 기술이전 표준절차):
+# - CRADA (Cooperative R&D Agreement): 국립연구소 + 기업 공동 R&D
+# - License Agreement: 연구소 IP 독점/비독점 라이선스
+# - Work For Others (WFO): 기업이 연구소에 용역 의뢰
+_FLC_CRADA_OPTIONS = [
+    {"type": "CRADA", "description": "국립연구소와 공동 R&D 협약, 비용 분담·공동 IP", "timeline_months": 12},
+    {"type": "License", "description": "연구소 보유 IP 독점/비독점 라이선스 취득", "timeline_months": 6},
+    {"type": "WFO", "description": "기업 자금으로 연구소에 특화 R&D 의뢰", "timeline_months": 9},
+]
 
 
 class DealStructurer(BaseAgent):
@@ -161,6 +171,7 @@ class DealStructurer(BaseAgent):
             "negotiation_guide": negotiation,
             "partner_shortlist": d.get("potential_partners", []),
             "deal_score": score,
+            "flc_crada_options": _FLC_CRADA_OPTIONS if "국립연구소" in str(d.get("potential_partners", [])) or d.get("use_national_lab") else [],
         }
 
     def _next_actions(self, gate: str, deal_type: str) -> list[str]:
