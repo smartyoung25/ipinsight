@@ -1,0 +1,76 @@
+{
+  "certifications": [
+    {
+      "cert": "CE Mark",
+      "region": "EU",
+      "applicable": ["의료기기", "전자제품", "기계", "소재"],
+      "duration_months": {"min": 3, "typical": 12, "max": 36},
+      "cost_eur": {"min": 5000, "typical": 30000, "max": 200000},
+      "body": "Notified Body",
+      "notes": "MDR 2017/745 의료기기는 2024년부터 강화. 소프트웨어는 SaMD 분류"
+    },
+    {
+      "cert": "FDA 510(k) / PMA",
+      "region": "USA",
+      "applicable": ["의료기기", "SaMD"],
+      "duration_months": {"min": 6, "typical": 18, "max": 48},
+      "cost_usd": {"min": 10000, "typical": 50000, "max": 500000},
+      "body": "FDA CDER/CDRH",
+      "notes": "Class I~III. AI/ML 기반 의료기기는 510(k)SE 경로"
+    },
+    {
+      "cert": "KC인증 (전기용품)",
+      "region": "KOR",
+      "applicable": ["전자제품", "IoT", "전기기기"],
+      "duration_months": {"min": 1, "typical": 3, "max": 6},
+      "cost_krw": {"min": 500000, "typical": 3000000, "max": 20000000},
+      "body": "KTC, TUV Korea 등",
+      "notes": "전기용품안전법 적용. 수입품 동일 적용"
+    },
+    {
+      "cert": "PMDA 승인 (일본)",
+      "region": "JPN",
+      "applicable": ["의약품", "의료기기"],
+      "duration_months": {"min": 12, "typical": 24, "max": 48},
+      "cost_jpy": {"min": 1000000, "typical": 10000000, "max": 100000000},
+      "body": "PMDA",
+      "notes": "일본 의료기기 승인. 영어 자료 병행 제출 가능"
+    },
+    {
+      "cert": "NMPA (중국)",
+      "region": "CHN",
+      "applicable": ["의약품", "의료기기", "화장품"],
+      "duration_months": {"min": 12, "typical": 30, "max": 60},
+      "cost_cny": {"min": 100000, "typical": 1000000, "max": 10000000},
+      "body": "NMPA",
+      "notes": "외자기업 현지 법인 필요. 데이터 현지화 요구"
+    },
+    {
+      "cert": "ISO 9001 / ISO 13485",
+      "region": "글로벌",
+      "applicable": ["전 산업", "의료기기(13485)"],
+      "duration_months": {"min": 3, "typical": 9, "max": 18},
+      "cost_usd": {"min": 5000, "typical": 20000, "max": 100000},
+      "body": "인증기관 (SGS, Bureau Veritas 등)",
+      "notes": "글로벌 B2B 거래 필수. 많은 정부조달 요건"
+    },
+    {
+      "cert": "FCC (미국 전파)",
+      "region": "USA",
+      "applicable": ["무선기기", "IoT", "통신장비"],
+      "duration_months": {"min": 1, "typical": 3, "max": 6},
+      "cost_usd": {"min": 5000, "typical": 20000, "max": 50000},
+      "body": "FCC 공인시험기관",
+      "notes": "미국 수출 무선기기 의무. CE와 병행 일반적"
+    },
+    {
+      "cert": "GMP (의약품 제조)",
+      "region": "글로벌",
+      "applicable": ["의약품", "건강기능식품", "화장품"],
+      "duration_months": {"min": 6, "typical": 18, "max": 36},
+      "cost_usd": {"min": 50000, "typical": 300000, "max": 2000000},
+      "body": "식약처, FDA, EMA",
+      "notes": "시설 실사 포함. MRL 평가와 연동"
+    }
+  ]
+}

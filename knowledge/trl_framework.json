@@ -1,0 +1,83 @@
+{
+  "framework": "NASA TRL (Technology Readiness Level)",
+  "source": "NASA, DoD, EU Horizon Europe",
+  "levels": [
+    {
+      "trl": 1,
+      "name": "기본 원리 관찰",
+      "description": "기초 연구 단계. 과학적 원리가 관찰되고 보고됨",
+      "evidence": ["학술논문", "연구노트", "이론 계산"],
+      "gate": "Kill — 응용 가능성 없으면 중단",
+      "typical_duration_months": 6
+    },
+    {
+      "trl": 2,
+      "name": "기술 개념 정립",
+      "description": "기술 개념 및 응용 분야 설정",
+      "evidence": ["개념 보고서", "타당성 검토서"],
+      "gate": "Hold — 특허 출원 전 선행기술 조사 필요",
+      "typical_duration_months": 6
+    },
+    {
+      "trl": 3,
+      "name": "개념 검증 (PoC)",
+      "description": "실험실 수준의 개념 검증 완료",
+      "evidence": ["실험 결과", "시뮬레이션 데이터", "PoC 영상"],
+      "gate": "Go — 임시특허 출원 시점",
+      "typical_duration_months": 12
+    },
+    {
+      "trl": 4,
+      "name": "실험실 검증",
+      "description": "실험실 환경에서 기술 구성요소 검증",
+      "evidence": ["시험성적서", "성능평가 보고서"],
+      "gate": "Go — 시장성 평가 병행 시작",
+      "typical_duration_months": 12
+    },
+    {
+      "trl": 5,
+      "name": "관련 환경 검증",
+      "description": "관련 환경(모사 환경)에서 기술 검증",
+      "evidence": ["환경시험 결과", "시제품 보고서"],
+      "gate": "Go — EIC/SBIR Phase I 지원 적기",
+      "typical_duration_months": 18
+    },
+    {
+      "trl": 6,
+      "name": "관련 환경 시연",
+      "description": "관련 환경에서 프로토타입 시스템 시연",
+      "evidence": ["프로토타입", "시연 영상", "성능 비교표"],
+      "gate": "Go — 파트너/라이선시 접촉 시작",
+      "typical_duration_months": 18
+    },
+    {
+      "trl": 7,
+      "name": "운영 환경 시연",
+      "description": "실제 운영 환경에서 시스템 프로토타입 시연",
+      "evidence": ["파일럿 결과", "현장 테스트 보고서"],
+      "gate": "Go — 라이선싱/스핀오프 결정 시점",
+      "typical_duration_months": 12
+    },
+    {
+      "trl": 8,
+      "name": "시스템 완성 및 검증",
+      "description": "실제 시스템 완성, 자격 시험 통과",
+      "evidence": ["인증서", "품질검사 결과", "계약서"],
+      "gate": "Go — 계약·딜 클로징 단계",
+      "typical_duration_months": 12
+    },
+    {
+      "trl": 9,
+      "name": "운영 실증",
+      "description": "실제 운영 환경에서 완전한 상업화 운영",
+      "evidence": ["매출 실적", "고객 레퍼런스", "양산 실적"],
+      "gate": "Go — 스케일업 및 글로벌 확장",
+      "typical_duration_months": 24
+    }
+  ],
+  "commercialization_readiness": {
+    "early": [1, 2, 3],
+    "mid": [4, 5, 6],
+    "late": [7, 8, 9]
+  }
+}

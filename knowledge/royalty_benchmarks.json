@@ -1,0 +1,76 @@
+{
+  "source": "AUTM, Licensing Economics Review, IPO, 2024-2025 데이터",
+  "note": "로열티율은 기술성숙도·시장독점성·협상력에 따라 ±50% 변동",
+  "industries": [
+    {
+      "sector": "소프트웨어·SaaS",
+      "royalty_rate_pct": {"min": 2, "typical": 4, "max": 8},
+      "upfront_fee_usd": {"min": 50000, "typical": 150000, "max": 500000},
+      "license_type": "비독점 선호",
+      "notes": "구독형 수익모델 전환 시 NRR 기반 재협상"
+    },
+    {
+      "sector": "바이오테크·제약",
+      "royalty_rate_pct": {"min": 3, "typical": 8, "max": 15},
+      "upfront_fee_usd": {"min": 100000, "typical": 1000000, "max": 10000000},
+      "license_type": "독점 선호",
+      "notes": "마일스톤 구조 필수. 임상 단계별 $1M~$50M 마일스톤"
+    },
+    {
+      "sector": "의료기기",
+      "royalty_rate_pct": {"min": 3, "typical": 6, "max": 10},
+      "upfront_fee_usd": {"min": 50000, "typical": 300000, "max": 2000000},
+      "license_type": "독점 또는 지역 독점",
+      "notes": "FDA/CE 인증 취득 후 상향 재협상 관행"
+    },
+    {
+      "sector": "반도체·전자",
+      "royalty_rate_pct": {"min": 1, "typical": 3, "max": 6},
+      "upfront_fee_usd": {"min": 100000, "typical": 500000, "max": 5000000},
+      "license_type": "비독점 다중 라이선싱",
+      "notes": "특허 풀(Patent Pool) 참여 시 1~2%로 하락"
+    },
+    {
+      "sector": "소재·화학",
+      "royalty_rate_pct": {"min": 2, "typical": 4, "max": 8},
+      "upfront_fee_usd": {"min": 50000, "typical": 200000, "max": 1000000},
+      "license_type": "독점 또는 분야별 독점",
+      "notes": "공정특허 포함 시 상향"
+    },
+    {
+      "sector": "스마트팜·농업기술",
+      "royalty_rate_pct": {"min": 2, "typical": 4, "max": 7},
+      "upfront_fee_usd": {"min": 30000, "typical": 100000, "max": 500000},
+      "license_type": "지역 독점 선호",
+      "notes": "SaaS + 하드웨어 번들 시 복합 수익모델"
+    },
+    {
+      "sector": "AI·데이터",
+      "royalty_rate_pct": {"min": 2, "typical": 5, "max": 10},
+      "upfront_fee_usd": {"min": 50000, "typical": 200000, "max": 2000000},
+      "license_type": "비독점 다중",
+      "notes": "모델 성능 기반 가변 로열티 구조 증가 추세"
+    },
+    {
+      "sector": "에너지·환경",
+      "royalty_rate_pct": {"min": 2, "typical": 4, "max": 8},
+      "upfront_fee_usd": {"min": 50000, "typical": 250000, "max": 1000000},
+      "license_type": "지역 또는 응용분야 독점",
+      "notes": "탄소크레딧 연계 수익모델 부상"
+    },
+    {
+      "sector": "제조·자동화",
+      "royalty_rate_pct": {"min": 1, "typical": 3, "max": 6},
+      "upfront_fee_usd": {"min": 50000, "typical": 200000, "max": 1000000},
+      "license_type": "비독점",
+      "notes": "유닛당 정액 로열티($X/대) 방식도 일반적"
+    }
+  ],
+  "deal_structures": {
+    "upfront_only": "기술성숙도 낮거나 상용화 불확실 시",
+    "royalty_only": "기술 검증 완료, 라이선시 협상력 강할 때",
+    "upfront_plus_royalty": "가장 일반적. 균형 리스크 배분",
+    "milestone_plus_royalty": "바이오/의료기기 업계 표준",
+    "equity_plus_royalty": "스핀오프·스타트업 라이선싱 시"
+  }
+}

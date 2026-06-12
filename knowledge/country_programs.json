@@ -1,0 +1,136 @@
+{
+  "programs": [
+    {
+      "country": "USA",
+      "name": "SBIR/STTR",
+      "agency": "NSF, NIST, DoD 등",
+      "type": "정부 R&D 보조금",
+      "trl_range": [1, 7],
+      "funding_usd": {"phase1": 275000, "phase2": 1800000},
+      "equity_free": true,
+      "url": "https://www.nsf.gov/sbir",
+      "apply_stage": ["G2", "G3"],
+      "notes": "2026년까지 연장. 연간 $250M+ 지원. 딥테크 우선"
+    },
+    {
+      "country": "USA",
+      "name": "NSF I-Corps",
+      "agency": "NSF",
+      "type": "고객발견·시장검증 훈련",
+      "trl_range": [3, 6],
+      "funding_usd": {"grant": 50000},
+      "equity_free": true,
+      "url": "https://www.nsf.gov/i-corps",
+      "apply_stage": ["G3", "G4"],
+      "notes": "7주 프로그램. 고객 인터뷰 100건 요구. 린스타트업 방법론"
+    },
+    {
+      "country": "KOR",
+      "name": "TIPS",
+      "agency": "KISED",
+      "type": "공공-민간 매칭 지원",
+      "trl_range": [4, 8],
+      "funding_krw": {"rd": 5000000000, "commercialization": 500000000},
+      "equity_free": true,
+      "url": "https://www.kised.or.kr",
+      "apply_stage": ["G2", "G3", "G4"],
+      "notes": "2026년 620개사 지원 목표. 글로벌 TIPS 30개 운영사"
+    },
+    {
+      "country": "KOR",
+      "name": "K-Startup Grand Challenge",
+      "agency": "KISED",
+      "type": "글로벌 스타트업 유치",
+      "trl_range": [5, 8],
+      "funding_krw": {"total": 950000000},
+      "equity_free": true,
+      "url": "https://www.k-startup.go.kr",
+      "apply_stage": ["G5", "G6"],
+      "notes": "외국인 스타트업 대상. 체류·사업화 지원"
+    },
+    {
+      "country": "EU",
+      "name": "EIC Accelerator",
+      "agency": "European Innovation Council",
+      "type": "보조금 + 지분투자 혼합",
+      "trl_range": [6, 8],
+      "funding_eur": {"grant": 2500000, "equity": 10000000},
+      "equity_free": false,
+      "url": "https://eic.ec.europa.eu/eic-accelerator",
+      "apply_stage": ["G5", "G6", "G7"],
+      "notes": "2025년 예산 €634M. 유럽 SME 대상. 코칭·멘토링 포함"
+    },
+    {
+      "country": "EU",
+      "name": "EIC Transition",
+      "agency": "European Innovation Council",
+      "type": "TRL 5→7 가속",
+      "trl_range": [5, 7],
+      "funding_eur": {"grant": 2500000},
+      "equity_free": true,
+      "url": "https://eic.ec.europa.eu/eic-transition",
+      "apply_stage": ["G2", "G3", "G7"],
+      "notes": "2025년 1월 출범. 40개 혁신기술 대상"
+    },
+    {
+      "country": "ISR",
+      "name": "Yozma Fund 2.0",
+      "agency": "이스라엘 혁신청",
+      "type": "정부 레버리지 VC",
+      "trl_range": [5, 9],
+      "funding_usd": {"annual": 1000000000},
+      "equity_free": false,
+      "url": "https://innovationisrael.org.il",
+      "apply_stage": ["G6", "G9"],
+      "notes": "정부 $0.3 : 기관 $1 매칭. 2024~2026 연간 $1B 목표"
+    },
+    {
+      "country": "SGP",
+      "name": "NRF T2i",
+      "agency": "National Research Foundation Singapore",
+      "type": "딥테크 기술이전",
+      "trl_range": [4, 7],
+      "funding_sgd": {"grant": 500000},
+      "equity_free": true,
+      "url": "https://www.nrf.gov.sg",
+      "apply_stage": ["G3", "G4", "G7"],
+      "notes": "Enterprise SG + IPI 삼각 연계. 제조·헬스·도시 집중"
+    },
+    {
+      "country": "JPN",
+      "name": "JST A-STEP",
+      "agency": "Japan Science and Technology Agency",
+      "type": "단계별 기술이전",
+      "trl_range": [3, 7],
+      "funding_jpy": {"feasibility": 5000000, "development": 150000000},
+      "equity_free": true,
+      "url": "https://www.jst.go.jp",
+      "apply_stage": ["G2", "G3", "G7"],
+      "notes": "타당성→개발→실증 3단계 구조"
+    },
+    {
+      "country": "JPN",
+      "name": "NEDO 딥테크 스타트업",
+      "agency": "NEDO",
+      "type": "딥테크 스타트업 지원",
+      "trl_range": [4, 8],
+      "funding_jpy": {"grant": 300000000},
+      "equity_free": true,
+      "url": "https://www.nedo.go.jp",
+      "apply_stage": ["G3", "G7"],
+      "notes": "에너지·소재·첨단제조 집중"
+    },
+    {
+      "country": "CHN",
+      "name": "TORCH Program",
+      "agency": "중국 과학기술부",
+      "type": "하이테크 산업단지 조성",
+      "trl_range": [6, 9],
+      "funding_cny": {"zone_support": "개별 협의"},
+      "equity_free": false,
+      "url": "https://www.torch.gov.cn",
+      "apply_stage": ["G8", "G9"],
+      "notes": "178개 국가하이테크단지. 2024년 19.3조 위안 산출"
+    }
+  ]
+}

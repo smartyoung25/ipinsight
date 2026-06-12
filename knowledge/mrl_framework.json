@@ -1,0 +1,23 @@
+{
+  "framework": "Manufacturing Readiness Level (MRL)",
+  "source": "US DoD, at.dod.mil",
+  "levels": [
+    {"mrl": 1, "name": "기초 제조 개념", "description": "제조 개념 식별", "trl_sync": 1},
+    {"mrl": 2, "name": "제조 개념 정의", "description": "제조 개념 정의 및 타당성 검토", "trl_sync": 2},
+    {"mrl": 3, "name": "제조 PoC", "description": "제조 가능성 실험 완료", "trl_sync": 3},
+    {"mrl": 4, "name": "실험실 환경 제조", "description": "실험실 수준 제조 공정 확인", "trl_sync": 4},
+    {"mrl": 5, "name": "시제품 제조", "description": "시제품 수준 제조 역량 확인", "trl_sync": 5},
+    {"mrl": 6, "name": "파일럿 라인 시연", "description": "시제품 제조 파일럿 라인 완성", "trl_sync": 6},
+    {"mrl": 7, "name": "저속 초기 생산", "description": "저속 초기 생산(LRIP) 가능", "trl_sync": 7},
+    {"mrl": 8, "name": "시범 생산", "description": "시범 생산 역량 완비", "trl_sync": 8},
+    {"mrl": 9, "name": "저속 생산 가능", "description": "저속 생산 시스템 완비", "trl_sync": 9},
+    {"mrl": 10, "name": "완전 생산", "description": "완전한 양산 역량 확보", "trl_sync": 9}
+  ],
+  "evaluation_criteria": {
+    "process": "제조 공정 정립 여부",
+    "cost": "원가 경쟁력",
+    "supply_chain": "공급망 안정성",
+    "quality": "품질관리 시스템",
+    "scale": "양산 확장 가능성"
+  }
+}

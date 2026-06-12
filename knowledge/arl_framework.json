@@ -1,0 +1,68 @@
+{
+  "framework": "Adoption Readiness Level (ARL)",
+  "source": "US Department of Energy (DOE)",
+  "description": "기술적 성숙도(TRL) 외 시장·고객 채택 측면의 비기술적 리스크를 평가",
+  "levels": [
+    {
+      "arl": 1,
+      "name": "채택 개념 인식",
+      "description": "잠재 사용자·구매자 식별 시작",
+      "criteria": ["타겟 고객군 정의", "문제 인식 확인"]
+    },
+    {
+      "arl": 2,
+      "name": "채택 요건 정의",
+      "description": "고객 요구사항 및 채택 장벽 정의",
+      "criteria": ["고객 인터뷰 10건 이상", "Pain Point 목록"]
+    },
+    {
+      "arl": 3,
+      "name": "초기 고객 관심",
+      "description": "초기 고객 관심 및 구매의향 확인",
+      "criteria": ["LOI 또는 MOU", "파일럿 요청서"]
+    },
+    {
+      "arl": 4,
+      "name": "고객 검증",
+      "description": "고객 검증 및 문제-솔루션 적합성 확인",
+      "criteria": ["PoC 참여 고객 3개사 이상", "구매의향서"]
+    },
+    {
+      "arl": 5,
+      "name": "시장 검증",
+      "description": "시장 내 제품-시장 적합성(PMF) 확인",
+      "criteria": ["파일럿 판매", "고객 재구매 의향"]
+    },
+    {
+      "arl": 6,
+      "name": "초기 상업화",
+      "description": "초기 상업 판매 시작",
+      "criteria": ["첫 상업 계약", "레퍼런스 고객"]
+    },
+    {
+      "arl": 7,
+      "name": "시장 확산",
+      "description": "시장 내 확산 및 반복 구매 확인",
+      "criteria": ["반복 구매 고객", "입소문/레퍼럴"]
+    },
+    {
+      "arl": 8,
+      "name": "주류 채택",
+      "description": "주류 시장 채택 달성",
+      "criteria": ["시장점유율 5% 이상", "업계 표준화"]
+    },
+    {
+      "arl": 9,
+      "name": "완전 시장 채택",
+      "description": "완전한 시장 채택 및 글로벌 확산",
+      "criteria": ["글로벌 시장 진출", "생태계 파트너십"]
+    }
+  ],
+  "risk_dimensions": {
+    "market": "시장 수요 불확실성",
+    "customer": "고객 행동 변화 저항",
+    "regulatory": "규제·인증 장벽",
+    "economic": "경제성·ROI 불확실성",
+    "ecosystem": "생태계·인프라 미성숙"
+  }
+}
