@@ -18,6 +18,7 @@ from agents import (
     IDFGenerator, PatentPortfolioStrategist, WhitespaceAnalyzer,
     PatentabilityAssessor,
     GlobalIPStrategist, CompetitiveMonitor, PortfolioOptimizer,
+    TeamAssessor, UnitEconomicsAssessor, FundingPlanner, RegulatoryRoadmapAgent,
 )
 
 app = FastAPI(
@@ -253,6 +254,59 @@ def generate_report(req: PipelineRequest):
         raise HTTPException(status_code=500, detail=f"리포트 생성 실패: {e}")
 
     return {"tech_id": req.tech_id, "report": report}
+
+
+@app.post("/execution/team")
+def assess_team(req: StageRequest):
+    """팀·실행 역량 평가 — I-Corps 5차원 + 채용 우선순위"""
+    try:
+        result = TeamAssessor().assess(req.input_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"tech_id": req.tech_id, "stage": "G4-Team", "result": result.to_dict()}
+
+
+@app.post("/execution/unit-economics")
+def assess_unit_economics(req: StageRequest):
+    """단위경제성 평가 — CAC·LTV·Burn Rate·손익분기"""
+    try:
+        result = UnitEconomicsAssessor().assess(req.input_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"tech_id": req.tech_id, "stage": "G5-UE", "result": result.to_dict()}
+
+
+@app.post("/execution/funding")
+def plan_funding(req: StageRequest):
+    """자금조달 시나리오 플래너 — Bootstrap→Series A 지분 희석 시뮬레이션"""
+    try:
+        result = FundingPlanner().assess(req.input_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"tech_id": req.tech_id, "stage": "G2-Funding", "result": result.to_dict()}
+
+
+@app.post("/execution/regulatory")
+def regulatory_roadmap(req: StageRequest):
+    """도메인별 규제·인증 로드맵 — 의료기기·SaMD·바이오·하드웨어·소프트웨어"""
+    try:
+        result = RegulatoryRoadmapAgent().assess(req.input_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"tech_id": req.tech_id, "stage": "G8-Reg", "result": result.to_dict()}
+
+
+@app.get("/execution/stages")
+def list_execution_stages():
+    """실행전략 모듈 목록"""
+    return {
+        "execution_modules": [
+            {"endpoint": "/execution/team",           "stage": "G4-Team",    "name": "팀·실행 역량 평가",        "gap": "팀 역량"},
+            {"endpoint": "/execution/unit-economics", "stage": "G5-UE",      "name": "CAC·LTV·Burn Rate",       "gap": "단위경제성"},
+            {"endpoint": "/execution/funding",        "stage": "G2-Funding", "name": "자금조달 시나리오 플래너", "gap": "자금조달"},
+            {"endpoint": "/execution/regulatory",     "stage": "G8-Reg",     "name": "규제·인증 로드맵",         "gap": "규제 경로"},
+        ]
+    }
 
 
 @app.get("/demo/sample-input")
