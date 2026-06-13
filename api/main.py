@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.schemas import StageRequest, PipelineRequest, FundingMatchRequest
 from pipeline.phase_gate_pipeline import PhaseGatePipeline, STAGE_NAMES
 from pipeline.funding_matcher import match_funding, recommend_funding_sequence
+from api.report_builder import build_report
 from agents import (
     IDFGenerator, PatentPortfolioStrategist, WhitespaceAnalyzer,
     PatentabilityAssessor,
@@ -211,6 +212,47 @@ def list_ip_stages():
             {"phase": 4, "name": "IP전략", "stages": ["G10", "G10-Global", "G10-Competitive", "G10-Portfolio"]},
         ]
     }
+
+
+@app.post("/ip/report")
+def generate_report(req: PipelineRequest):
+    """파이프라인 결과 → 투자자용 종합 진단 리포트
+
+    두 가지 사용 방법:
+    1) tech_id만 입력 → 기존 저장 결과(outputs/{tech_id}/) 로드 후 리포트
+    2) stage_inputs 포함 → 즉시 파이프라인 실행 + 리포트 생성
+    """
+    pipeline = PhaseGatePipeline(tech_id=req.tech_id)
+
+    # stage_inputs가 있으면 파이프라인 실행
+    if req.stage_inputs:
+        try:
+            pipeline.run_pipeline(stage_inputs=req.stage_inputs, stop_on_kill=False)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    all_results = pipeline.get_all_results()
+
+    # 저장된 결과도 없으면 에러
+    if not all_results:
+        import json
+        from pathlib import Path
+        output_dir = Path(__file__).parent.parent / "outputs" / req.tech_id
+        if not output_dir.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"'{req.tech_id}' 결과 없음. stage_inputs를 포함해 파이프라인을 먼저 실행하세요.",
+            )
+        for f in sorted(output_dir.glob("G*_result.json")):
+            stage_num = f.stem.split("_")[0].replace("G", "")
+            all_results[stage_num] = json.loads(f.read_text(encoding="utf-8"))
+
+    try:
+        report = build_report(req.tech_id, all_results)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"리포트 생성 실패: {e}")
+
+    return {"tech_id": req.tech_id, "report": report}
 
 
 @app.get("/demo/sample-input")

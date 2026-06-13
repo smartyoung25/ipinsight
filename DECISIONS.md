@@ -43,6 +43,33 @@
 
 ---
 
+### [D-2026-06-07] G6 Monte Carlo — 4변수 독립 샘플링 + TRL 연동 불확실성
+**결정**: 4개 변수(매출·할인율·로열티·기여도)를 독립 샘플링, TRL별 분산 차등
+**대안**: 단일 revenue_shock 가우시안 (기존 방식)
+**이유**: 단일 쇼크는 변수 간 상관을 가정해 P10/P90 폭이 과소 또는 과대 추정됨. TRL 낮을수록 매출 예측 불확실성이 실질적으로 크므로 `trl_factor = (9-trl)/9` 로 rev_std 스케일
+**결과**: TRL1 rev_std=35%, TRL5=19.4%, TRL9=3.9%. P10/P50/P90 bear/base/bull 레이블 추가
+**영향 파일**: `agents/g6_valuation_engine.py` `_monte_carlo()`
+
+---
+
+### [D-2026-06-08] Venture Client Model — G9 7번째 거래유형으로 통합
+**결정**: TRL 6-8 + B2B 조건 충족 시 venture_client 거래유형 자동 추천
+**대안**: 별도 G9.5 Venture Client 스테이지 분리
+**이유**: 거래유형 선택은 G9 Deal Structurer의 핵심 출력. 분리하면 사용자가 G9를 건너뛰고 Venture Client를 볼 방법이 없음. 7번째 옵션으로 통합이 UX 면에서 자연스러움
+**벤치마크**: BMW i Ventures·Porsche·Bosch·BASF·Siemens 5개 프로그램 (대기업 PoC 비용 부담, 스타트업 지분 희석 없음)
+**영향 파일**: `agents/g9_deal_structurer.py` `_VENTURE_CLIENT_PROGRAMS`, `_recommend_deal()`
+
+---
+
+### [D-2026-06-09] BCG Matrix X축 — 자기선언 대신 복합 객관 점수
+**결정**: X축 = competitive_position_score(0~100) = 자기선언(35%) + 특허수명(25%) + TRL(20%) + ARL(20%)
+**대안**: 자기선언 strong/medium/weak 단순 매핑 (기존)
+**이유**: 자기선언만 쓰면 모든 기술이 "strong"으로 신고해 BCG가 무의미해짐. TRL·ARL·특허수명은 외부 검증 가능한 지표이므로 편향 완화
+**결과**: X임계값 50점 기준선. 객관 점수가 35% 이상이므로 자기선언 영향력은 최대 35점
+**영향 파일**: `agents/g10_portfolio_optimizer.py` `_competitive_position_score()`, `_classify_tech()`
+
+---
+
 ### [D-2026-06-06] 컨텍스트 관리 — SPRINT+NEXT+DECISIONS 3파일 체계
 **결정**: CLAUDE.md는 불변 원칙만, 상태는 SPRINT.md/NEXT.md로 분리
 **대안**: CLAUDE.md 단일 파일에 모든 상태 기록 (기존 방식)
