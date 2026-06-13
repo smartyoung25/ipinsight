@@ -288,7 +288,7 @@ class PoCVerifier:
     def print_report(self) -> None:
         r = self.report
         print(f"\n{'='*60}")
-        print(f"  PoC 검증 결과서 — IPInsight Agent OS v2.0")
+        print(f"  PoC 검증 결과서 - IPInsight Agent OS v2.0")
         print(f"  시각: {r.timestamp}")
         print(f"  환경: {r.environment}")
         print(f"{'='*60}")
@@ -297,9 +297,10 @@ class PoCVerifier:
             if item.category != cat:
                 cat = item.category
                 print(f"\n【{cat}】")
-            icon = {"PASS": "✅", "FAIL": "❌", "WARN": "⚠️", "SKIP": "⬜"}[item.status]
-            print(f"  {icon} {item.name:<30} {item.detail[:60]}  ({item.duration_ms}ms)")
-        print(f"\n{'─'*60}")
+            icon = {"PASS": "[PASS]", "FAIL": "[FAIL]", "WARN": "[WARN]", "SKIP": "[SKIP]"}[item.status]
+            detail = item.detail[:60].replace("—", "-").replace("–", "-")
+            print(f"  {icon} {item.name:<30} {detail}  ({item.duration_ms}ms)")
+        print(f"\n{'-'*60}")
         print(f"  합계: {r.total}건  PASS={r.passed}  FAIL={r.failed}  WARN={r.warned}  SKIP={r.skipped}")
         print(f"  통과율: {r.pass_rate}%")
         print(f"{'='*60}\n")
@@ -317,5 +318,5 @@ if __name__ == "__main__":
     verifier.run_all()
     verifier.print_report()
     path = verifier.save_report()
-    print(f"📄 보고서 저장: {path}")
+    print(f"[SAVE] 보고서 저장: {path}")
     sys.exit(0 if verifier.report.failed == 0 else 1)

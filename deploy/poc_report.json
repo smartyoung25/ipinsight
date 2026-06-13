@@ -1,0 +1,123 @@
+{
+  "timestamp": "2026-06-13T23:26:10.756146",
+  "environment": "cloud_poc",
+  "total": 14,
+  "passed": 13,
+  "failed": 0,
+  "warned": 1,
+  "skipped": 0,
+  "items": [
+    {
+      "category": "AI 모델",
+      "name": "LLM 폴백",
+      "description": "API 키 없을 때 규칙기반 폴백 동작 확인",
+      "status": "PASS",
+      "detail": "폴백 응답: [규칙기반 폴백] 테스트 분석 완료. LLM 키 설정 시 상세 분석 가능.",
+      "duration_ms": 2435.5
+    },
+    {
+      "category": "AI 모델",
+      "name": "RAG 인덱스 빌드",
+      "description": "knowledge/*.json 벡터 인덱싱 확인",
+      "status": "PASS",
+      "detail": "인덱싱된 청크: 20개",
+      "duration_ms": 16.9
+    },
+    {
+      "category": "AI 모델",
+      "name": "RAG 검색",
+      "description": "쿼리 → 유사 청크 검색 동작 확인",
+      "status": "PASS",
+      "detail": "컨텍스트 길이: 776자",
+      "duration_ms": 0.0
+    },
+    {
+      "category": "데이터",
+      "name": "knowledge/*.json 무결성",
+      "description": "9개 지식베이스 JSON 파싱 가능 여부",
+      "status": "PASS",
+      "detail": "10/10 파일 파싱 성공",
+      "duration_ms": 2.0
+    },
+    {
+      "category": "데이터",
+      "name": "스키마 정의서",
+      "description": "knowledge/schema.json 존재 + 6개 도메인 확인",
+      "status": "PASS",
+      "detail": "도메인: ['patent', 'paper', 'rd_project', 'tech_transfer', 'market_info', 'support_program']",
+      "duration_ms": 0.0
+    },
+    {
+      "category": "서비스",
+      "name": "전체 에이전트 임포트",
+      "description": "agents/__init__.py 모든 클래스 임포트 확인",
+      "status": "PASS",
+      "detail": "모든 에이전트 임포트 성공",
+      "duration_ms": 0.0
+    },
+    {
+      "category": "서비스",
+      "name": "로드맵 빌더",
+      "description": "TRL3→9 로드맵 마일스톤 생성 확인",
+      "status": "PASS",
+      "detail": "마일스톤 6개 생성",
+      "duration_ms": 3.9
+    },
+    {
+      "category": "서비스",
+      "name": "수요조사서 생성",
+      "description": "DemandSurveyGenerator 동작 확인",
+      "status": "PASS",
+      "detail": "수요조사서 score=50.0",
+      "duration_ms": 586.1
+    },
+    {
+      "category": "서비스",
+      "name": "SMK 생성",
+      "description": "SMKGenerator 동작 확인",
+      "status": "PASS",
+      "detail": "SMK score=80.0",
+      "duration_ms": 749.6
+    },
+    {
+      "category": "서비스",
+      "name": "API /health",
+      "description": "FastAPI 서버 헬스체크 (http://localhost:8100)",
+      "status": "WARN",
+      "detail": "서버 미응답 (정상 — 로컬 서버 구동 불필요): <urlopen error [WinError 10061] 대상 컴퓨터에서 연결을 거부했으므로 연결하지 못했습니다>",
+      "duration_ms": 4096.6
+    },
+    {
+      "category": "서비스",
+      "name": "Gap 엔드포인트 등록",
+      "description": "api/main.py에 9개 gap 엔드포인트 확인",
+      "status": "PASS",
+      "detail": "모든 Gap 엔드포인트 등록됨",
+      "duration_ms": 0.0
+    },
+    {
+      "category": "검증",
+      "name": "테스트 파일 존재",
+      "description": "tests/ 디렉터리 테스트 파일 확인",
+      "status": "PASS",
+      "detail": "테스트 파일 10개 발견: ['test_agents.py', 'test_api_live.py', 'test_arl_5d.py', 'test_e2e_pipeline.py', 'test_execution_strategy.py', 'test_gap_medium_long.py', 'test_ip_lifecycle.py', 'test_report.py', 'test_v3_fixes.py', 'test_v5_improvements.py']",
+      "duration_ms": 0.0
+    },
+    {
+      "category": "검증",
+      "name": "온프레미스 요구사항",
+      "description": "requirements.txt + .env.example 존재 확인",
+      "status": "PASS",
+      "detail": "requirements.txt=True, .env=True",
+      "duration_ms": 0.0
+    },
+    {
+      "category": "검증",
+      "name": "Python 버전",
+      "description": "Python 3.10+ 확인",
+      "status": "PASS",
+      "detail": "Python 3.11.9",
+      "duration_ms": 0.0
+    }
+  ]
+}
