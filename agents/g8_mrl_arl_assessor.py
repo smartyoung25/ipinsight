@@ -1,4 +1,15 @@
-"""G8 MRL·ARL 3중 성숙도 평가 — DoD MRL + DOE ARL + NIST MEP"""
+"""G8 MRL·ARL 3중 성숙도 평가 — DoD MRL + DOE ARL 5차원 독립 평가 + NIST MEP
+
+DOE ARL 5차원 독립 평가 (v2 — 공식 표준 정합):
+  market(25%)   : 시장 수요 증거 단계
+  customer(25%) : 고객 행동 변화·채택 검증 단계
+  regulatory(20%): 규제·인증 취득 진행도
+  economic(20%) : 경제성·ROI 실증 단계
+  ecosystem(10%): 생태계·인프라·파트너 단계
+
+ARL 최종 = 5차원 가중평균 − 병목 패널티
+병목 원칙: 단일 차원 ARL <= 2이면 전체 ARL 최대 4로 제한
+"""
 from __future__ import annotations
 from .base_agent import BaseAgent, StageResult
 
@@ -20,14 +31,29 @@ class MRLARLAssessor(BaseAgent):
 
     def assess(self, input_data: dict) -> StageResult:
         """
-        input_data: trl (int), manufacturing_process_defined (bool),
-                    supply_chain_ready (bool), quality_system (str),
-                    unit_cost_usd, target_cost_usd, certifications_obtained (list),
-                    certifications_required (list), customer_pilots (int),
-                    repeat_purchase_rate_pct, regulatory_approved (bool)
+        input_data:
+          trl (int): 현재 TRL
+          manufacturing_process_defined (bool), supply_chain_ready (bool),
+          quality_system (str), unit_cost_usd, target_cost_usd,
+          certifications_obtained (list), certifications_required (list),
+          --- ARL 5차원 입력 (DOE 공식 기준) ---
+          market_interview_count (int): 고객 인터뷰 건수
+          market_tam_validated (bool): TAM 정량화 완료
+          market_repeat_purchase_pct (float): 재구매율 %
+          customer_loi_count (int): LoI/MOU 건수
+          customer_poc_count (int): PoC 참여 고객수
+          customer_nps (float, optional): NPS 점수
+          regulatory_approved (bool): 주요 인증 취득 여부
+          regulatory_submission_done (bool): 인증 신청 완료
+          economic_pilot_revenue_usd (float): 파일럿 매출
+          economic_break_even_modeled (bool): 손익분기 분석 완료
+          economic_unit_economics_validated (bool): 실 Unit Economics 측정
+          ecosystem_partner_count (int): 파트너 수
+          ecosystem_integration_done (bool): 통합 구현 완료
         """
         mrl = self._assess_mrl(input_data)
-        arl = self._assess_arl(input_data)
+        arl_5d = self._assess_arl_5d(input_data)
+        arl = arl_5d["arl_final"]
         trl = input_data.get("trl", 1)
 
         # 3중 성숙도 복합 점수 (TRL 40%, MRL 30%, ARL 30%)
@@ -53,7 +79,10 @@ class MRLARLAssessor(BaseAgent):
 
         reg_paths = []
         for cert in cert_gap:
-            match = next((r for r in reg_kb.get("certifications", []) if r.get("cert", "").lower() in cert.lower()), None)
+            match = next(
+                (r for r in reg_kb.get("certifications", []) if r.get("cert", "").lower() in cert.lower()),
+                None
+            )
             if match:
                 reg_paths.append({
                     "cert": cert,
@@ -84,10 +113,9 @@ class MRLARLAssessor(BaseAgent):
             "arl_assessment": {
                 "arl_level": arl,
                 "arl_name": arl_info.get("name", ""),
-                "customer_pilots": input_data.get("customer_pilots", 0),
-                "repeat_purchase_rate_pct": input_data.get("repeat_purchase_rate_pct", 0),
-                "regulatory_approved": input_data.get("regulatory_approved", False),
-                "adoption_risk_dimensions": self._adoption_risks(input_data),
+                "arl_5d_detail": arl_5d,
+                "bottleneck_dimension": arl_5d.get("bottleneck"),
+                "adoption_risk_dimensions": self._adoption_risks_5d(arl_5d),
             },
             "certification_roadmap": {
                 "obtained": cert_obtained,
@@ -123,21 +151,130 @@ class MRLARLAssessor(BaseAgent):
             return min(10, trl + 1)
         return min(8, trl)
 
-    def _assess_arl(self, d: dict) -> int:
-        pilots = d.get("customer_pilots", 0)
-        repeat = d.get("repeat_purchase_rate_pct", 0)
-        approved = d.get("regulatory_approved", False)
-        if pilots == 0:
+    def _assess_arl_5d(self, d: dict) -> dict:
+        """DOE ARL 5차원 독립 평가 — 가중평균 + 병목 원칙"""
+        m  = self._arl_market(d)
+        c  = self._arl_customer(d)
+        rg = self._arl_regulatory(d)
+        ec = self._arl_economic(d)
+        es = self._arl_ecosystem(d)
+
+        # 가중평균 (knowledge/arl_framework.json dimension_weights)
+        weighted = m * 0.25 + c * 0.25 + rg * 0.20 + ec * 0.20 + es * 0.10
+
+        # 병목 원칙: 단일 차원 <=2 이면 전체 최대 4
+        dims = {"market": m, "customer": c, "regulatory": rg, "economic": ec, "ecosystem": es}
+        bottleneck = min(dims, key=dims.get)
+        if dims[bottleneck] <= 2:
+            arl_final = min(4, round(weighted))
+            bottleneck_applied = True
+        else:
+            arl_final = max(1, min(9, round(weighted)))
+            bottleneck_applied = False
+
+        return {
+            "arl_final": arl_final,
+            "weighted_raw": round(weighted, 2),
+            "bottleneck": bottleneck if bottleneck_applied else None,
+            "bottleneck_applied": bottleneck_applied,
+            "dimensions": {
+                "market":     {"arl": m,  "weight": 0.25},
+                "customer":   {"arl": c,  "weight": 0.25},
+                "regulatory": {"arl": rg, "weight": 0.20},
+                "economic":   {"arl": ec, "weight": 0.20},
+                "ecosystem":  {"arl": es, "weight": 0.10},
+            },
+        }
+
+    # ── ARL 차원별 평가 ──
+
+    def _arl_market(self, d: dict) -> int:
+        n = d.get("market_interview_count", d.get("customer_pilots", 0))
+        tam_ok = d.get("market_tam_validated", False)
+        repeat = d.get("market_repeat_purchase_pct", d.get("repeat_purchase_rate_pct", 0))
+        if not tam_ok and n < 5:
+            return 1
+        if not tam_ok:
             return 2
-        if pilots < 3:
+        if n < 10:
             return 3
-        if pilots < 10:
-            return 4 if not approved else 5
-        if repeat > 30:
+        if n < 30:
+            return 4
+        if repeat == 0:
+            return 5
+        if repeat > 20:
             return 7
-        if repeat > 10:
+        if repeat > 5:
             return 6
         return 5
+
+    def _arl_customer(self, d: dict) -> int:
+        loi = d.get("customer_loi_count", 0)
+        poc = d.get("customer_poc_count", d.get("customer_pilots", 0))
+        nps = d.get("customer_nps", -1)
+        repeat = d.get("market_repeat_purchase_pct", d.get("repeat_purchase_rate_pct", 0))
+        if loi == 0 and poc == 0:
+            return 2
+        if loi >= 1 and poc == 0:
+            return 3
+        if poc >= 3 and loi >= 1:
+            base = 4
+        elif poc >= 1:
+            base = 4
+        else:
+            base = 3
+        if repeat > 0:
+            base = max(base, 5)
+        if nps >= 30:
+            base = max(base, 7)
+        elif nps >= 0:
+            base = max(base, 6)
+        return min(9, base)
+
+    def _arl_regulatory(self, d: dict) -> int:
+        approved = d.get("regulatory_approved", False)
+        submitted = d.get("regulatory_submission_done", False)
+        cert_req = d.get("certifications_required", [])
+        cert_got = set(d.get("certifications_obtained", []))
+        if not cert_req:
+            return 5  # 규제 불필요 = 장벽 없음
+        coverage = len([c for c in cert_req if c in cert_got]) / len(cert_req)
+        if coverage == 0 and not submitted:
+            return 2
+        if coverage == 0 and submitted:
+            return 4
+        if coverage < 1.0:
+            return 5
+        return 6 if approved else 5
+
+    def _arl_economic(self, d: dict) -> int:
+        pilot_rev = d.get("economic_pilot_revenue_usd", 0)
+        be_modeled = d.get("economic_break_even_modeled", False)
+        ue_validated = d.get("economic_unit_economics_validated", False)
+        if not be_modeled:
+            return 2
+        if be_modeled and not ue_validated:
+            return 3
+        if ue_validated and pilot_rev == 0:
+            return 4
+        if pilot_rev > 0 and pilot_rev < 50_000:
+            return 5
+        if pilot_rev >= 50_000:
+            return 6
+        return 3
+
+    def _arl_ecosystem(self, d: dict) -> int:
+        partners = d.get("ecosystem_partner_count", 0)
+        integrated = d.get("ecosystem_integration_done", False)
+        if partners == 0:
+            return 2
+        if partners >= 1 and not integrated:
+            return 4
+        if integrated and partners >= 2:
+            return 6
+        if integrated:
+            return 5
+        return 3
 
     def _cost_check(self, d: dict) -> dict:
         unit = d.get("unit_cost_usd", 0)
@@ -150,12 +287,19 @@ class MRLARLAssessor(BaseAgent):
             "status": "적정" if ratio <= 1.5 else "과다" if ratio <= 3 else "심각",
         }
 
-    def _adoption_risks(self, d: dict) -> dict:
+    def _adoption_risks_5d(self, arl_5d: dict) -> dict:
+        """ARL 점수 → 리스크 레벨 변환 (DOE 5차원 정합)"""
+        def level(arl_score: int) -> str:
+            if arl_score >= 6:
+                return "Low"
+            if arl_score >= 4:
+                return "Medium"
+            return "High"
+
+        dims = arl_5d.get("dimensions", {})
         return {
-            "market_demand_risk": "Low" if d.get("customer_pilots", 0) >= 5 else "High",
-            "regulatory_risk": "Low" if d.get("regulatory_approved") else "High",
-            "ecosystem_risk": "Medium",
-            "economic_risk": "Low" if d.get("repeat_purchase_rate_pct", 0) > 20 else "Medium",
+            d: {"arl": v["arl"], "risk": level(v["arl"])}
+            for d, v in dims.items()
         }
 
     def _readiness_summary(self, trl: int, mrl: int, arl: int) -> str:
