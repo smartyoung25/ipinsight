@@ -12,6 +12,76 @@ _FLC_CRADA_OPTIONS = [
     {"type": "WFO", "description": "기업 자금으로 연구소에 특화 R&D 의뢰", "timeline_months": 9},
 ]
 
+# Venture Client Model (BMW i Ventures 벤치마크):
+# - 대기업이 스타트업의 첫 번째 유료 고객이 됨 (지분 취득 없음)
+# - PoC 비용 대기업 부담 → 스타트업: 매출 + 레퍼런스 + 우선구매권(ROFR)
+# - vs Equity VC: 지분 희석 없음, 빠른 매출 창출, 실증 환경 제공
+# - 적정 TRL: 6~8 (실증 가능한 단계, 완제품 불필요)
+_VENTURE_CLIENT_PROGRAMS = [
+    {
+        "corp": "BMW i Ventures",
+        "focus": "모빌리티·스마트팩토리·AI",
+        "poc_budget_usd": 100_000,
+        "timeline_weeks": 12,
+        "rofr": True,
+        "url_ref": "bmwiventures.com",
+    },
+    {
+        "corp": "Porsche Ventures",
+        "focus": "모빌리티·디지털·지속가능성",
+        "poc_budget_usd": 80_000,
+        "timeline_weeks": 10,
+        "rofr": False,
+        "url_ref": "porsche-ventures.com",
+    },
+    {
+        "corp": "Bosch Startup Harbour",
+        "focus": "IoT·AI·제조·에너지",
+        "poc_budget_usd": 75_000,
+        "timeline_weeks": 16,
+        "rofr": True,
+        "url_ref": "bosch-startup.com",
+    },
+    {
+        "corp": "BASF Venture Capital",
+        "focus": "소재·화학·농업·디지털",
+        "poc_budget_usd": 120_000,
+        "timeline_weeks": 14,
+        "rofr": True,
+        "url_ref": "basf-vc.de",
+    },
+    {
+        "corp": "Siemens Next47",
+        "focus": "산업AI·에너지·스마트그리드",
+        "poc_budget_usd": 150_000,
+        "timeline_weeks": 12,
+        "rofr": False,
+        "url_ref": "next47.com",
+    },
+]
+
+_VENTURE_CLIENT_CONTRACT = {
+    "structure": [
+        "PoC 계약 (SOW 기반) — 대기업이 정해진 범위·기간·금액으로 PoC 구매",
+        "성과 기준 (KPI) 명시 — 달성 시 상용 계약으로 자동 전환 조건",
+        "IP 귀속: 스타트업 보유, PoC 결과물 대기업 사용권(비독점·사내한정)",
+        "ROFR(우선구매권): 상용화 시 가격·조건 동등 조건으로 우선 협상권",
+        "NDA + 기밀유지: 기술 유출 방지, 일반적으로 2~3년",
+    ],
+    "advantages_vs_vc": {
+        "no_equity_dilution": "지분 희석 없음 — 창업자 소유권 보전",
+        "immediate_revenue": "PoC 단계부터 매출 발생 (캐시플로 개선)",
+        "reference_customer": "글로벌 대기업 레퍼런스 확보 → 후속 투자/고객 유치 용이",
+        "product_validation": "실제 운영 환경에서 제품 검증 (TRL 7→8 빠른 진입)",
+        "faster_deal": "VC 투자 대비 계약 속도 4~8배 빠름 (2~6주 vs 6~18개월)",
+    },
+    "risks": [
+        "대기업 의존도 과다 → 협상력 약화 위험 (복수 벤처 클라이언트 확보 권장)",
+        "PoC 범위 과다 확대 요구 → SOW 명확화 필수",
+        "IP 크리프: PoC 결과물 권리 범위 분쟁 → 계약 시 IP 조항 세밀화",
+    ],
+}
+
 
 class DealStructurer(BaseAgent):
     stage_id = "G9"
@@ -66,6 +136,14 @@ class DealStructurer(BaseAgent):
             "upside": "중간 (시장 레퍼런스)",
             "best_for": "공공문제 해결형 또는 인프라 기술",
         },
+        "venture_client": {
+            "name": "벤처 클라이언트 (Venture Client)",
+            "timeline_months": 3,
+            "capital_required": "없음 (대기업 PoC 비용 부담)",
+            "control": "높음 (IP 보유)",
+            "upside": "높음 (매출+레퍼런스+ROFR)",
+            "best_for": "TRL 6-8, 기업 고객 대상 B2B, 지분 희석 없이 매출·레퍼런스 동시 확보 원하는 경우",
+        },
     }
 
     def assess(self, input_data: dict) -> StageResult:
@@ -90,7 +168,12 @@ class DealStructurer(BaseAgent):
         team_cap = d.get("team_commercialization_capability", 3)
         trl = d.get("trl", 5)
         val = d.get("valuation_usd", 0)
+        b2b = d.get("is_b2b", False)
+        corp_interest = d.get("corporate_customer_interest", False)
 
+        # Venture Client: TRL 6-8 + B2B + 기업 고객 관심 존재 시 최우선
+        if 6 <= trl <= 8 and (b2b or corp_interest):
+            return "venture_client"
         if team_cap >= 4 and trl >= 7 and val >= 5_000_000:
             return "spinoff"
         if ip_score >= 70 and team_cap <= 3:
@@ -150,6 +233,18 @@ class DealStructurer(BaseAgent):
         except Exception:
             negotiation = {"negotiation_strategy": llm_result}
 
+        # Venture Client 매칭 (업종·기술 키워드 기반)
+        trl = d.get("trl", 5)
+        tech_name = d.get("tech_name", "").lower()
+        vc_programs = []
+        if recommended == "venture_client" or (6 <= trl <= 8):
+            for prog in _VENTURE_CLIENT_PROGRAMS:
+                focus_kws = [kw.lower() for kw in prog["focus"].split("·")]
+                if any(kw in tech_name for kw in focus_kws) or not tech_name:
+                    vc_programs.append(prog)
+            if not vc_programs:
+                vc_programs = _VENTURE_CLIENT_PROGRAMS[:2]  # 매칭 없으면 상위 2개 제안
+
         return {
             "deal_type_recommendation": {
                 "recommended": recommended,
@@ -167,6 +262,14 @@ class DealStructurer(BaseAgent):
                 "valuation_usd": d.get("valuation_usd", 0),
                 "target_countries": target_countries,
                 "funding_options": funding_options[:5],
+            },
+            "venture_client_strategy": {
+                "applicable": recommended == "venture_client" or (6 <= trl <= 8),
+                "matched_programs": vc_programs,
+                "contract_structure": _VENTURE_CLIENT_CONTRACT["structure"],
+                "advantages_vs_vc": _VENTURE_CLIENT_CONTRACT["advantages_vs_vc"],
+                "risks": _VENTURE_CLIENT_CONTRACT["risks"],
+                "note": "BMW i Ventures 벤치마크: PoC 계약 → 12주 실증 → 상용화 우선협상",
             },
             "negotiation_guide": negotiation,
             "partner_shortlist": d.get("potential_partners", []),

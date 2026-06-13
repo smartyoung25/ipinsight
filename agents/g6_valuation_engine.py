@@ -126,23 +126,89 @@ class ValuationEngine(BaseAgent):
         return base + option_premium
 
     def _monte_carlo(self, d: dict) -> dict:
+        """4-변수 독립 샘플링 Monte Carlo — P10/P50/P90 분포 + 시나리오 레이블
+
+        변수별 불확실성 (업계 표준 범위):
+          revenue_std  : 매출 예측 ±35% (스타트업 초기 스테이지 통계)
+          discount_std : 할인율 ±15% (VC 요구수익률 변동)
+          royalty_std  : 로열티율 ±20% (협상 결과 분포)
+          contrib_std  : 기술기여도 ±15% (전문가 의견 편차)
+        """
         runs = d.get("monte_carlo_runs", 1000)
+        forecasts = d.get("revenue_forecast", [])
+        r_base = d.get("discount_rate_pct", 15) / 100
+        ry_base = d.get("royalty_rate_pct", 3) / 100
+        tc_base = d.get("tech_contribution_pct", 30) / 100
+        trl = d.get("trl", 5)
+        years = d.get("patent_remaining_years", 10)
+
+        # 불확실성 표준편차 (TRL 낮을수록 분산 확대)
+        # TRL 1→1.0, TRL 5→0.56, TRL 7→0.33, TRL 9→0.11
+        trl_factor = max(0.1, (9 - trl) / 9)
+        rev_std = 0.35 * trl_factor
+        disc_std = 0.15
+        royalty_std = 0.20
+        contrib_std = 0.15
+
         results = []
-        base = self._dcf(d)
         for _ in range(runs):
-            # 매출 성장률 ±30% 변동, 할인율 ±20% 변동
-            revenue_shock = random.gauss(1.0, 0.3)
-            discount_shock = random.gauss(1.0, 0.2)
-            val = base * revenue_shock / discount_shock
-            results.append(max(val, 0))
+            rev_shock = max(0.1, random.gauss(1.0, rev_std))
+            disc_shock = max(0.5, random.gauss(1.0, disc_std))
+            ry_shock = max(0.1, random.gauss(1.0, royalty_std))
+            tc_shock = max(0.1, random.gauss(1.0, contrib_std))
+
+            r_sim = r_base * disc_shock
+            ry_sim = ry_base * ry_shock
+            tc_sim = tc_base * tc_shock
+
+            dcf_v, roy_v = 0.0, 0.0
+            for t, rev in enumerate(forecasts, 1):
+                rev_s = rev * rev_shock
+                dcf_v += (rev_s * tc_sim) / ((1 + r_sim) ** t)
+                if t <= years:
+                    roy_v += (rev_s * ry_sim) / ((1 + r_sim) ** t)
+
+            if trl < _TRL_DCF_THRESHOLD:
+                sim_val = roy_v * 0.50 + dcf_v * 0.30
+            else:
+                sim_val = dcf_v * 0.45 + roy_v * 0.35
+            results.append(max(sim_val, 0))
+
         results.sort()
         n = len(results)
+        p10 = results[int(n * 0.10)]
+        p50 = results[int(n * 0.50)]
+        p90 = results[int(n * 0.90)]
+        mean = sum(results) / n
+        std_dev = (sum((x - mean) ** 2 for x in results) / n) ** 0.5
+
         return {
             "runs": runs,
-            "p10": results[int(n * 0.1)],
-            "p50": results[int(n * 0.5)],
-            "p90": results[int(n * 0.9)],
-            "mean": sum(results) / n,
+            "p10": p10,  # Bear scenario
+            "p50": p50,  # Base scenario
+            "p90": p90,  # Bull scenario
+            "mean": mean,
+            "std_dev": std_dev,
+            "scenarios": {
+                "bear": {"label": "비관 (P10)", "value_usd": round(p10, 0),
+                         "description": "시장 수요 저조·경쟁 심화·높은 할인율"},
+                "base": {"label": "기본 (P50)", "value_usd": round(p50, 0),
+                         "description": "현재 가정 중간값"},
+                "bull": {"label": "낙관 (P90)", "value_usd": round(p90, 0),
+                         "description": "시장 확대·라이선싱 성공·낮은 할인율"},
+            },
+            "uncertainty_drivers": {
+                "revenue_std_pct": round(rev_std * 100, 1),
+                "discount_rate_std_pct": round(disc_std * 100, 1),
+                "royalty_rate_std_pct": round(royalty_std * 100, 1),
+                "contrib_std_pct": round(contrib_std * 100, 1),
+                "trl_uncertainty_factor": round(trl_factor, 2),
+            },
+            "confidence_interval_80pct": {
+                "lower_usd": round(p10, 0),
+                "upper_usd": round(p90, 0),
+                "width_ratio": round(p90 / max(p10, 1), 2),
+            },
         }
 
     def _score(self, d: dict, val: float) -> float:

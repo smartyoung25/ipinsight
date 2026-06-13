@@ -84,9 +84,9 @@ class PortfolioOptimizer(BaseAgent):
         avg_trl = sum(t.get("trl", 1) for t in techs) / len(techs)
         score += round(avg_trl / 9 * 20, 1)
 
-        # 경쟁 위치 (15점)
-        strong_count = sum(1 for t in techs if t.get("competitive_position") == "strong")
-        score += round(strong_count / len(techs) * 15, 1)
+        # 경쟁 위치 복합 점수 (15점)
+        avg_comp = sum(self._competitive_position_score(t) for t in techs) / len(techs)
+        score += round(avg_comp / 100 * 15, 1)
 
         # 특허 잔존 수명 (15점)
         avg_life = sum(t.get("patent_remaining_years", 0) for t in techs) / len(techs)
@@ -94,28 +94,68 @@ class PortfolioOptimizer(BaseAgent):
 
         return round(min(score, 100), 1)
 
-    def _classify_tech(self, tech: dict) -> str:
+    def _competitive_position_score(self, tech: dict) -> float:
+        """BCG X축 — 경쟁 위치 복합 점수 (0~100)
+        자기 선언 competitive_position을 IP 강도 지표로 보완.
+
+        구성:
+          ① 자기 선언 포지션 (35점): strong=35, medium=20, weak=5
+          ② 특허 잔존 수명 (25점): 20년→25점, 5년→6점
+          ③ TRL 성숙도 (20점): TRL 9→20점
+          ④ ARL 시장 채택 (20점): ARL 9→20점
+        """
+        pos = tech.get("competitive_position", "weak")
+        pos_score = {"strong": 35, "medium": 20, "weak": 5}.get(pos, 5)
+
+        life = tech.get("patent_remaining_years", 0)
+        life_score = min(25, life * 1.25)
+
+        trl = tech.get("trl", 1)
+        trl_score = round(trl / 9 * 20, 1)
+
+        arl = tech.get("arl", 1)
+        arl_score = round(arl / 9 * 20, 1)
+
+        return round(pos_score + life_score + trl_score + arl_score, 1)
+
+    def _classify_tech(self, tech: dict) -> tuple[str, dict]:
+        """BCG Matrix 분류 + 좌표 반환
+        X축: 경쟁 위치 점수 (0~100) — 높을수록 강함
+        Y축: 시장 성장률 (%)
+        기준선: X=50 (경쟁위치 중간), Y=10% (고성장 임계)
+        """
         growth = tech.get("market_growth_pct", 0)
-        position = tech.get("competitive_position", "weak")
+        comp_score = self._competitive_position_score(tech)
         high_growth = growth >= 10
-        strong_pos = position == "strong"
+        strong_pos = comp_score >= 50
+
         if high_growth and strong_pos:
-            return "star"
-        if not high_growth and strong_pos:
-            return "cash_cow"
-        if high_growth and not strong_pos:
-            return "question_mark"
-        return "dog"
+            category = "star"
+        elif not high_growth and strong_pos:
+            category = "cash_cow"
+        elif high_growth and not strong_pos:
+            category = "question_mark"
+        else:
+            category = "dog"
+
+        bcg_coords = {
+            "x_competitive_score": comp_score,   # 0~100 (높을수록 강함)
+            "y_market_growth_pct": growth,
+            "quadrant": category,
+            "x_threshold": 50,
+            "y_threshold": 10,
+        }
+        return category, bcg_coords
 
     def _build_output(self, d: dict, score: float) -> dict:
         techs = d.get("portfolio_techs", [])
         budget = d.get("total_ip_budget_usd", 0)
         focus = d.get("strategic_focus", "growth")
 
-        # 기술별 분류 + ROI 산정
+        # 기술별 분류 + ROI 산정 + BCG 좌표
         classified = []
         for t in techs:
-            cat = self._classify_tech(t)
+            cat, bcg_coords = self._classify_tech(t)
             rev = t.get("annual_revenue_usd", 0)
             cost = t.get("annual_cost_usd", 1)
             lic = t.get("licensing_revenue_usd", 0)
@@ -126,6 +166,7 @@ class PortfolioOptimizer(BaseAgent):
                 "roi": round(rev / max(cost, 1) * 100, 1),
                 "licensing_share_pct": round(lic / max(rev, 1) * 100, 1),
                 "recommended_action": _TECH_CATEGORIES[cat]["action"],
+                "bcg_position": bcg_coords,
             })
 
         # 카테고리별 요약
@@ -176,6 +217,38 @@ class PortfolioOptimizer(BaseAgent):
                 "resource_reallocation": [f"Dog 기술 IP 유지비 절감으로 Star 투자 재원 확보"],
             }
 
+        # BCG 기반 예산 배분 (기본 규칙: Star 40%, Cash Cow 20%, QM 30%, Dog 10%)
+        _BUDGET_ALLOC = {"star": 0.40, "cash_cow": 0.20, "question_mark": 0.30, "dog": 0.10}
+        # strategic_focus에 따라 조정
+        if focus == "growth":
+            _BUDGET_ALLOC.update({"star": 0.45, "question_mark": 0.35, "cash_cow": 0.15, "dog": 0.05})
+        elif focus == "efficiency":
+            _BUDGET_ALLOC.update({"cash_cow": 0.40, "star": 0.30, "question_mark": 0.20, "dog": 0.10})
+        elif focus == "defense":
+            _BUDGET_ALLOC.update({"star": 0.35, "cash_cow": 0.30, "question_mark": 0.25, "dog": 0.10})
+
+        budget_allocation = {
+            cat: {
+                "alloc_pct": round(_BUDGET_ALLOC[cat] * 100, 0),
+                "budget_usd": round(budget * _BUDGET_ALLOC[cat], 0),
+                "tech_count": cat_summary[cat]["count"],
+                "rationale": _TECH_CATEGORIES[cat]["action"],
+            }
+            for cat in _TECH_CATEGORIES
+        }
+
+        # BCG 매트릭스 좌표 집계 (시각화용)
+        bcg_matrix_data = [
+            {
+                "tech_name": c.get("tech_name", ""),
+                "x": c["bcg_position"]["x_competitive_score"],
+                "y": c["bcg_position"]["y_market_growth_pct"],
+                "quadrant": c["category"],
+                "revenue_usd": c.get("annual_revenue_usd", 0),
+            }
+            for c in classified
+        ]
+
         return {
             "portfolio_optimization_plan": {
                 "tech_name": "전체 IP 포트폴리오",
@@ -183,6 +256,15 @@ class PortfolioOptimizer(BaseAgent):
                 "strategic_focus": focus,
                 "category_summary": cat_summary,
                 "classified_portfolio": classified,
+                "bcg_matrix": {
+                    "data_points": bcg_matrix_data,
+                    "x_axis": "경쟁 위치 점수 (IP강도·TRL·ARL·특허수명 복합, 0~100)",
+                    "y_axis": "시장 성장률 (%)",
+                    "x_threshold": 50,
+                    "y_threshold": 10,
+                    "note": "BCG Matrix X축을 자기선언 대신 IP 강도 지표로 객관화 (TRL+ARL+특허수명+경쟁위치)",
+                },
+                "budget_allocation": budget_allocation,
             },
             "divestment_recommendation": {
                 "candidates": divestment_candidates,
@@ -202,8 +284,8 @@ class PortfolioOptimizer(BaseAgent):
 
     def _next_actions(self, gate: str, d: dict) -> list[str]:
         techs = d.get("portfolio_techs", [])
-        dogs = [t for t in techs if self._classify_tech(t) == "dog"]
-        stars = [t for t in techs if self._classify_tech(t) == "star"]
+        dogs = [t for t in techs if self._classify_tech(t)[0] == "dog"]
+        stars = [t for t in techs if self._classify_tech(t)[0] == "star"]
         if gate == "Go":
             return [
                 f"Star 기술 {len(stars)}건 집중 투자 계획 수립 (G9 거래구조 연계)",
