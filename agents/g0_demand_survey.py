@@ -46,7 +46,7 @@ class DemandSurveyGenerator(BaseAgent):
           pilot_customers (list[str], optional): LoI·파일럿 고객 목록
           geographic_focus (list[str], optional): 목표 지역 (KOR/USA/EU 등)
         """
-        rag_ctx  = self._rag(input_data.get("tech_name","") + " " + input_data.get("tech_description",""))
+        rag_ctx  = self._rag(input_data.get("tech_name","") + " " + input_data.get("tech_description",""), top_k=4, source_filter="market")
         score    = self._score(input_data)
         gate     = self._gate_from_score(score)
         output   = self._build_output(input_data, rag_ctx, score)
@@ -55,13 +55,6 @@ class DemandSurveyGenerator(BaseAgent):
             output_doc=output,
             next_actions=self._next_actions(gate, input_data),
         )
-
-    def _rag(self, query: str) -> str:
-        try:
-            from pipeline.rag_retriever import rag_search
-            return rag_search(query, top_k=4, source_filter="market")
-        except Exception:
-            return ""
 
     def _score(self, d: dict) -> float:
         score = 0.0

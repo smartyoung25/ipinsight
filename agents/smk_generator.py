@@ -46,7 +46,7 @@ class SMKGenerator(BaseAgent):
           trl (int)
           pilot_customers (list[str])
         """
-        rag_ctx = self._rag(f"{input_data.get('tech_name','')} 시장 경쟁 GTM 전략")
+        rag_ctx = self._rag(f"{input_data.get('tech_name','')} 시장 경쟁 GTM 전략", top_k=3)
         score   = self._score(input_data)
         gate    = self._gate_from_score(score)
         output  = self._build_output(input_data, rag_ctx, score)
@@ -55,13 +55,6 @@ class SMKGenerator(BaseAgent):
             output_doc=output,
             next_actions=self._next_actions(gate, input_data),
         )
-
-    def _rag(self, query: str) -> str:
-        try:
-            from pipeline.rag_retriever import rag_search
-            return rag_search(query, top_k=3)
-        except Exception:
-            return ""
 
     def _score(self, d: dict) -> float:
         score = 0.0
