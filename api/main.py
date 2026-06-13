@@ -14,7 +14,8 @@ from api.schemas import StageRequest, PipelineRequest, FundingMatchRequest
 from pipeline.phase_gate_pipeline import PhaseGatePipeline, STAGE_NAMES
 from pipeline.funding_matcher import match_funding, recommend_funding_sequence
 from agents import (
-    IDFGenerator, PatentPortfolioStrategist, PatentabilityAssessor,
+    IDFGenerator, PatentPortfolioStrategist, WhitespaceAnalyzer,
+    PatentabilityAssessor,
     GlobalIPStrategist, CompetitiveMonitor, PortfolioOptimizer,
 )
 
@@ -147,6 +148,16 @@ def build_portfolio_strategy(req: StageRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"tech_id": req.tech_id, "stage": "G1-Portfolio", "result": result.to_dict()}
+
+
+@app.post("/ip/whitespace")
+def analyze_whitespace(req: StageRequest):
+    """특허 화이트스페이스 분석 — WIPO 특허 지형 분석 표준 (FTO 보완)"""
+    try:
+        result = WhitespaceAnalyzer().assess(req.input_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"tech_id": req.tech_id, "stage": "G1-Whitespace", "result": result.to_dict()}
 
 
 @app.post("/ip/patentability")

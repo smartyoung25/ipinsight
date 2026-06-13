@@ -1,8 +1,18 @@
-"""G6 IP·기술 가치평가 — DCF·로열티역산·Real Option·Monte Carlo"""
+"""G6 IP·기술 가치평가 — 로열티구제법(주) · DCF(보조) · Real Option · Monte Carlo
+
+주법 선택 근거 (Stanford OTL·MIT TLO·AICPA 기준):
+  - TRL < 7 (매출 발생 전): 로열티구제법(Relief from Royalty)이 주법
+    → IP가 없을 경우 지불했을 로열티의 현재가치 = IP의 내재 가치
+  - TRL >= 7 (매출 발생 후): DCF 주법, 로열티구제법 교차검증
+  DCF를 조기 IP에 주법으로 쓰면 매출 가정이 불확실해 체계적 과대평가 발생.
+"""
 from __future__ import annotations
 import math
 import random
 from .base_agent import BaseAgent, StageResult
+
+# TRL 임계점: 이 이상이면 DCF를 주법으로 전환
+_TRL_DCF_THRESHOLD = 7
 
 
 class ValuationEngine(BaseAgent):
@@ -13,15 +23,26 @@ class ValuationEngine(BaseAgent):
         """
         input_data: tech_name, industry_sector, revenue_forecast (list of annual USD),
                     discount_rate_pct, royalty_rate_pct, tech_contribution_pct,
-                    patent_remaining_years, risk_adjustment_pct, monte_carlo_runs
+                    patent_remaining_years, risk_adjustment_pct, monte_carlo_runs,
+                    trl (int, optional, 주법 선택에 사용)
         """
+        trl = input_data.get("trl", 5)
         dcf_val = self._dcf(input_data)
         royalty_val = self._royalty(input_data)
         real_option_val = self._real_option(input_data)
         mc_result = self._monte_carlo(input_data)
 
-        # 가중 평균 (DCF 40%, 로열티 35%, Real Option 25%)
-        weighted_val = dcf_val * 0.4 + royalty_val * 0.35 + real_option_val * 0.25
+        # ── 주법 선택 (Stanford OTL·MIT TLO·AICPA 표준) ──
+        # TRL < 7: 로열티구제법 주(50%) + DCF 보조(30%) + Real Option(20%)
+        # TRL >= 7: DCF 주(45%) + 로열티구제법(35%) + Real Option(20%)
+        if trl < _TRL_DCF_THRESHOLD:
+            weighted_val = royalty_val * 0.50 + dcf_val * 0.30 + real_option_val * 0.20
+            methodology = f"로열티구제법(주·50%) + DCF(보조·30%) + Real Option(20%) — TRL {trl}<7 적용"
+            primary_method = "relief_from_royalty"
+        else:
+            weighted_val = dcf_val * 0.45 + royalty_val * 0.35 + real_option_val * 0.20
+            methodology = f"DCF(주·45%) + 로열티구제법(보조·35%) + Real Option(20%) — TRL {trl}≥7 적용"
+            primary_method = "dcf"
 
         score = self._score(input_data, weighted_val)
         gate = self._gate_from_score(score)
@@ -29,8 +50,10 @@ class ValuationEngine(BaseAgent):
         output_doc = {
             "tech_valuation_report": {
                 "tech_name": input_data.get("tech_name", ""),
-                "dcf_value_usd": round(dcf_val, 0),
+                "primary_method": primary_method,
+                "trl_at_valuation": trl,
                 "royalty_value_usd": round(royalty_val, 0),
+                "dcf_value_usd": round(dcf_val, 0),
                 "real_option_value_usd": round(real_option_val, 0),
                 "weighted_value_usd": round(weighted_val, 0),
                 "value_range_usd": {
@@ -38,7 +61,8 @@ class ValuationEngine(BaseAgent):
                     "mid": round(mc_result["p50"], 0),
                     "high": round(mc_result["p90"], 0),
                 },
-                "methodology": "DCF 40% + 로열티역산 35% + Real Option 25%",
+                "methodology": methodology,
+                "methodology_basis": "Stanford OTL·MIT TLO·AICPA — TRL 7 미만은 로열티구제법 주법",
             },
             "ip_valuation": {
                 "patent_remaining_years": input_data.get("patent_remaining_years", 0),
@@ -61,10 +85,17 @@ class ValuationEngine(BaseAgent):
             "valuation_score": score,
         }
 
+        warnings = []
+        if trl < _TRL_DCF_THRESHOLD and primary_method == "dcf":
+            warnings.append("TRL 7 미만에서 DCF 주법 사용 — 과대평가 위험. 로열티구제법 주법 전환 검토")
+        if not input_data.get("royalty_rate_pct"):
+            warnings.append("royalty_rate_pct 미입력 — 산업 벤치마크 기본값(4%) 사용 중")
+
         return StageResult(
             stage=self.stage_id, score=score, gate=gate,
             output_doc=output_doc,
             next_actions=self._next_actions(gate, weighted_val),
+            warnings=warnings,
         )
 
     def _dcf(self, d: dict) -> float:

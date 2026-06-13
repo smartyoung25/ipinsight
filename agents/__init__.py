@@ -14,6 +14,7 @@ from .g10_performance_tracker import PerformanceTracker
 # IP Lifecycle 확장 Agent (4단계 IP 프로세스 통합)
 from .g0_idf_generator import IDFGenerator            # 1단계: 발명공개서(IDF)
 from .g1_portfolio_strategist import PatentPortfolioStrategist  # 1단계: 특허 포트폴리오
+from .g1_whitespace_analyzer import WhitespaceAnalyzer          # 1단계: 화이트스페이스 (WIPO)
 from .g2_patentability_assessor import PatentabilityAssessor    # 2단계: 권리성 심화
 from .g10_global_ip_strategist import GlobalIPStrategist        # 4단계: 글로벌 IP 전략
 from .g10_competitive_monitor import CompetitiveMonitor         # 4단계: 경쟁대응
@@ -25,6 +26,7 @@ __all__ = [
     "CustomerValidator", "BMDesigner", "ValuationEngine", "PoCManager",
     "MRLARLAssessor", "DealStructurer", "PerformanceTracker",
     # IP Lifecycle 확장
-    "IDFGenerator", "PatentPortfolioStrategist", "PatentabilityAssessor",
+    "IDFGenerator", "PatentPortfolioStrategist", "WhitespaceAnalyzer",
+    "PatentabilityAssessor",
     "GlobalIPStrategist", "CompetitiveMonitor", "PortfolioOptimizer",
 ]

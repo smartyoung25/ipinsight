@@ -32,6 +32,12 @@ class MRLARLAssessor(BaseAgent):
 
         # 3중 성숙도 복합 점수 (TRL 40%, MRL 30%, ARL 30%)
         score = round(trl / 9 * 40 + mrl / 10 * 30 + arl / 9 * 30, 1)
+
+        # ── 규제 리스크 Gate 패널티 (EIC Accelerator 기준) ──
+        # regulatory_paths.json 연동: 미취득 인증의 예상 소요월이 클수록 패널티
+        reg_penalty, reg_risk_level = self._regulatory_gate_penalty(input_data)
+        score = max(0, round(score - reg_penalty, 1))
+
         gate = self._gate_from_score(score)
 
         mrl_kb = self._load_knowledge("mrl_framework.json")
@@ -62,6 +68,8 @@ class MRLARLAssessor(BaseAgent):
                 "mrl": mrl,
                 "arl": arl,
                 "composite_score": score,
+                "regulatory_risk_level": reg_risk_level,
+                "regulatory_gate_penalty": reg_penalty,
                 "readiness_summary": self._readiness_summary(trl, mrl, arl),
             },
             "mrl_assessment": {
@@ -156,6 +164,36 @@ class MRLARLAssessor(BaseAgent):
         if trl >= 5 and mrl >= 5 and arl >= 4:
             return "부분 준비 — 보완 후 상용화 가능"
         return "추가 개발·검증 필요"
+
+    def _regulatory_gate_penalty(self, d: dict) -> tuple[float, str]:
+        """규제 미취득 인증의 예상 소요 기간으로 Gate 패널티 산출 (EIC Accelerator 기준)
+        - 총 소요 24개월 초과: High risk → -15점
+        - 12~24개월: Medium → -8점
+        - 12개월 미만: Low → 0점
+        """
+        reg_kb = self._load_knowledge("regulatory_paths.json")
+        cert_required = d.get("certifications_required", [])
+        cert_obtained = set(d.get("certifications_obtained", []))
+        cert_gap = [c for c in cert_required if c not in cert_obtained]
+
+        total_months = 0
+        for cert in cert_gap:
+            match = next(
+                (r for r in reg_kb.get("certifications", [])
+                 if r.get("cert", "").lower() in cert.lower()),
+                None
+            )
+            if match:
+                total_months += match.get("duration_months", {}).get("typical", 12)
+            else:
+                total_months += 12  # 미지정 인증은 보수적으로 12개월 가정
+
+        if total_months > 24:
+            return 15.0, "High"
+        elif total_months > 12:
+            return 8.0, "Medium"
+        else:
+            return 0.0, "Low"
 
     def _next_actions(self, gate: str, mrl: int, arl: int, cert_gap: list) -> list[str]:
         actions = []
