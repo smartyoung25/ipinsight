@@ -260,6 +260,51 @@ def generate_report(req: PipelineRequest):
     return {"tech_id": req.tech_id, "report": report}
 
 
+@app.get("/ip/db-status")
+def db_status():
+    """전체 연결 DB 가용성 실시간 점검 — Phase 1~3 11+4개 DB ping"""
+    import urllib.request
+    import urllib.error
+
+    DB_LIST = [
+        # Phase 1 — 즉시연결 (키 불필요)
+        {"name": "OpenAlex",         "url": "https://api.openalex.org/works?filter=title.search:test&per-page=1", "phase": 1, "auth": False},
+        {"name": "World Bank",        "url": "https://api.worldbank.org/v2/country/KR/indicator/NY.GDP.MKTP.CD?format=json&mrv=1", "phase": 1, "auth": False},
+        {"name": "ClinicalTrials.gov","url": "https://clinicaltrials.gov/api/v2/studies?query.term=test&pageSize=1", "phase": 1, "auth": False},
+        {"name": "PubMed/NCBI",       "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=test&retmax=1&retmode=json", "phase": 1, "auth": False},
+        {"name": "Europe PMC",        "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=test&format=json&pageSize=1", "phase": 1, "auth": False},
+        {"name": "OECD.Stat",         "url": "https://stats.oecd.org/sdmx-json/data/MSTI_PUB/KOR.TOT_GERD.REAL_PPP.USD_MIO/all?startTime=2020&endTime=2022&format=jsondata", "phase": 1, "auth": False},
+        {"name": "Climate TRACE",     "url": "https://api.climatetrace.org/v6/definitions/sectors", "phase": 1, "auth": False},
+        {"name": "EUDAMED",           "url": "https://ec.europa.eu/tools/eudamed/api/actors?page=0&size=1", "phase": 1, "auth": False},
+        {"name": "ROR",               "url": "https://api.ror.org/organizations?query=KAIST", "phase": 1, "auth": False},
+        {"name": "Our World in Data", "url": "https://ourworldindata.org/grapher/share-of-electricity-low-carbon.csv", "phase": 1, "auth": False},
+        # Phase 2 — 키 등록 후
+        {"name": "GLEIF LEI",         "url": "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Samsung", "phase": 2, "auth": True},
+        {"name": "Open Supply Hub",   "url": "https://opensupplyhub.org/api/facilities/?page=1&pageSize=1", "phase": 2, "auth": True},
+        {"name": "UN Comtrade v2",    "url": "https://comtradeapi.un.org/public/v1/preview/C/A/HS/528", "phase": 2, "auth": True},
+        {"name": "NTIS",              "url": "https://www.ntis.go.kr/rndopen/api/v1/project?serviceKey=TEST&numOfRows=1", "phase": 2, "auth": True},
+    ]
+
+    results = []
+    for db in DB_LIST:
+        try:
+            req = urllib.request.Request(db["url"], headers={"Accept": "application/json", "User-Agent": "IPInsight/1.0"})
+            with urllib.request.urlopen(req, timeout=5) as r:
+                results.append({"name": db["name"], "status": "ok", "http": r.status, "phase": db["phase"], "auth_required": db["auth"]})
+        except urllib.error.HTTPError as e:
+            results.append({"name": db["name"], "status": "auth_error" if e.code in (401, 403) else "error", "http": e.code, "phase": db["phase"], "auth_required": db["auth"]})
+        except Exception as e:
+            results.append({"name": db["name"], "status": "unreachable", "http": None, "phase": db["phase"], "auth_required": db["auth"], "detail": str(e)[:60]})
+
+    ok_count   = sum(1 for r in results if r["status"] == "ok")
+    return {
+        "checked": len(results),
+        "available": ok_count,
+        "unavailable": len(results) - ok_count,
+        "databases": results,
+    }
+
+
 @app.post("/execution/team")
 def assess_team(req: StageRequest):
     """팀·실행 역량 평가 — I-Corps 5차원 + 채용 우선순위"""
