@@ -259,7 +259,7 @@ def test_full_pipeline():
             f"G10 이전 단계에서 Kill 발생: G{summary['killed_at']} — 입력 데이터 확인 필요"
         print("\n[정상] G10 Kill = TRL5 초기 스타트업의 올바른 판정")
         print("       (매출 $40K / 목표 $1M = 4% 달성 → Kill 기준 미충족)")
-    return summary
+    assert summary is not None
 
 
 def _print_key_metrics(results: dict):

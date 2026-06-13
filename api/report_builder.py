@@ -123,14 +123,12 @@ def _build_maturity_profile(results: dict) -> dict:
             "name":  mrl.get("mrl_name", ""),
         }
         arl5d = arl.get("arl_5d_detail", {})
-        dims = {}
-        for k, v in arl5d.items():
-            if isinstance(v, dict):
-                dims[k] = v.get("score", v.get("arl_score", "N/A"))
-            else:
-                dims[k] = v
+        # arl_5d_detail.dimensions 안에 실제 차원별 {arl, weight} 구조
+        raw_dims = arl5d.get("dimensions", {})
+        dims = {k: v.get("arl", "N/A") if isinstance(v, dict) else v
+                for k, v in raw_dims.items()}
         profile["arl"] = {
-            "level":      arl.get("arl_level", arl.get("overall_arl", "N/A")),
+            "level":      arl.get("arl_level", "N/A"),
             "name":       arl.get("arl_name", ""),
             "bottleneck": arl.get("bottleneck_dimension", ""),
             "dimensions": dims,

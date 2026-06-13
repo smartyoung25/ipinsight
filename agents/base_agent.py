@@ -6,6 +6,13 @@ from dataclasses import dataclass, field, asdict
 from typing import Any, Literal
 from pathlib import Path
 
+# 프로젝트 루트 .env 자동 로드 (python-dotenv 설치 시)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).parent.parent / ".env", override=False)
+except ImportError:
+    pass
+
 Gate = Literal["Go", "Hold", "Kill"]
 
 KNOWLEDGE_DIR = Path(__file__).parent.parent / "knowledge"
