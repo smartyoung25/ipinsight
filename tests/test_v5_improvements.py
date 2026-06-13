@@ -1,6 +1,6 @@
 """경쟁력 80점+ 수정 검증 — Monte Carlo P10/P50/P90 · Venture Client · BCG Matrix"""
 import sys
-sys.path.insert(0, "C:/IPinsight_a")
+sys.path.insert(0, "C:/IPinsight")
 
 from agents import ValuationEngine, DealStructurer, PortfolioOptimizer
 

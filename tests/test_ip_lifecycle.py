@@ -1,6 +1,6 @@
 """IP Lifecycle 확장 Agent 6개 동작 검증"""
 import sys
-sys.path.insert(0, "C:/IPinsight_a")
+sys.path.insert(0, "C:/IPinsight")
 
 from agents import (
     IDFGenerator, PatentPortfolioStrategist, PatentabilityAssessor,

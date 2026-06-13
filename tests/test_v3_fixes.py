@@ -1,6 +1,6 @@
 """v3 4개 수정 검증 — 가치평가 주법·JTBD·규제Gate·화이트스페이스"""
 import sys
-sys.path.insert(0, "C:/IPinsight_a")
+sys.path.insert(0, "C:/IPinsight")
 
 from agents import ValuationEngine, CustomerValidator, MRLARLAssessor, WhitespaceAnalyzer
 

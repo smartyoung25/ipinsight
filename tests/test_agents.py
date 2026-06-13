@@ -1,6 +1,6 @@
 """Agent 동작 검증 스크립트"""
 import sys
-sys.path.insert(0, "C:/IPinsight_a")
+sys.path.insert(0, "C:/IPinsight")
 
 from agents import TechScout, TRLAssessor, ValuationEngine, MarketScanner
 

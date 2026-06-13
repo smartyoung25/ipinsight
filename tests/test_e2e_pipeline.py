@@ -7,7 +7,7 @@
 """
 import sys
 import json
-sys.path.insert(0, "C:/IPinsight_a")
+sys.path.insert(0, "C:/IPinsight")
 
 from pipeline.phase_gate_pipeline import PhaseGatePipeline
 
@@ -243,7 +243,7 @@ def test_full_pipeline():
 
     # 산출물 파일 확인
     from pathlib import Path
-    output_dir = Path("C:/IPinsight_a/outputs") / TECH_ID
+    output_dir = Path("C:/IPinsight/outputs") / TECH_ID
     files = sorted(output_dir.glob("*.json"))
     print(f"\n산출물 파일: {len(files)}개")
     for f in files:

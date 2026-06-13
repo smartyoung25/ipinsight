@@ -1,6 +1,6 @@
 """ARL 5차원 독립 평가 검증 — DOE 공식 표준 정합"""
 import sys
-sys.path.insert(0, "C:/IPinsight_a")
+sys.path.insert(0, "C:/IPinsight")
 from agents import MRLARLAssessor
 
 
