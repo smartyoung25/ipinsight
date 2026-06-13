@@ -1,0 +1,155 @@
+{
+  "_comment": "Layer 2 — 데이터·테이블 정의서: 6개 데이터 도메인 × 메타데이터 스키마",
+  "version": "1.0.0",
+  "domains": {
+    "patent": {
+      "label": "특허 정보",
+      "source": ["KIPRIS OpenAPI", "USPTO", "EPO OPS", "JPO J-PlatPat"],
+      "primary_key": "patent_id",
+      "fields": {
+        "patent_id":       {"type": "string",  "desc": "출원번호 (KR·US·EP·JP 접두어)",   "example": "KR-10-2024-0012345"},
+        "title":           {"type": "string",  "desc": "발명의 명칭",                      "nullable": false},
+        "abstract":        {"type": "text",    "desc": "요약",                              "max_length": 2000},
+        "ipc_codes":       {"type": "array",   "desc": "국제특허분류 코드 (IPC)",           "example": ["G06N", "A01G"]},
+        "cpc_codes":       {"type": "array",   "desc": "협력특허분류 (CPC)",                "nullable": true},
+        "applicant":       {"type": "string",  "desc": "출원인 (기관·기업명)"},
+        "inventors":       {"type": "array",   "desc": "발명자 목록"},
+        "filing_date":     {"type": "date",    "desc": "출원일 (YYYY-MM-DD)"},
+        "publication_date":{"type": "date",    "desc": "공개일"},
+        "grant_date":      {"type": "date",    "desc": "등록일",                            "nullable": true},
+        "status":          {"type": "enum",    "desc": "특허 상태",                         "values": ["출원", "공개", "등록", "소멸", "포기"]},
+        "countries":       {"type": "array",   "desc": "등록 국가 코드 (ISO 3166)"},
+        "claims_count":    {"type": "integer", "desc": "청구항 수"},
+        "family_id":       {"type": "string",  "desc": "특허 패밀리 ID",                   "nullable": true},
+        "citation_count":  {"type": "integer", "desc": "피인용 수",                         "nullable": true},
+        "trl_estimate":    {"type": "integer", "desc": "TRL 추정값 (1~9)",                 "nullable": true},
+        "embedding_vector":{"type": "vector",  "desc": "텍스트 임베딩 (dim 768)",          "nullable": true}
+      }
+    },
+    "paper": {
+      "label": "논문 정보",
+      "source": ["NTIS", "NDSL", "PubMed", "arXiv", "Scopus"],
+      "primary_key": "doi",
+      "fields": {
+        "doi":             {"type": "string",  "desc": "디지털 객체 식별자"},
+        "title":           {"type": "string",  "desc": "논문 제목"},
+        "abstract":        {"type": "text",    "desc": "초록"},
+        "authors":         {"type": "array",   "desc": "저자 목록"},
+        "journal":         {"type": "string",  "desc": "게재지명"},
+        "publish_year":    {"type": "integer", "desc": "발행 연도"},
+        "keywords":        {"type": "array",   "desc": "키워드"},
+        "citation_count":  {"type": "integer", "desc": "인용 수"},
+        "open_access":     {"type": "boolean", "desc": "오픈 액세스 여부"},
+        "related_patent_ids":{"type":"array",  "desc": "연계 특허 ID 목록",               "nullable": true}
+      }
+    },
+    "rd_project": {
+      "label": "R&D 과제 정보",
+      "source": ["NTIS API", "NRF", "IITP", "KOITA", "KIAT"],
+      "primary_key": "project_id",
+      "fields": {
+        "project_id":      {"type": "string",  "desc": "과제 고유번호"},
+        "project_name":    {"type": "string",  "desc": "과제명"},
+        "institution":     {"type": "string",  "desc": "주관기관"},
+        "pi_name":         {"type": "string",  "desc": "연구책임자"},
+        "start_date":      {"type": "date",    "desc": "시작일"},
+        "end_date":        {"type": "date",    "desc": "종료일"},
+        "total_budget_krw":{"type": "integer", "desc": "총 연구비 (원)"},
+        "tech_field":      {"type": "string",  "desc": "기술 분야 (국가과학기술분류)"},
+        "status":          {"type": "enum",    "desc": "과제 상태",                         "values": ["진행","완료","중단"]},
+        "trl_target":      {"type": "integer", "desc": "목표 TRL"},
+        "outcome_patents":  {"type": "array",  "desc": "성과 특허 ID 목록",               "nullable": true},
+        "outcome_papers":   {"type": "array",  "desc": "성과 논문 DOI 목록",              "nullable": true}
+      }
+    },
+    "tech_transfer": {
+      "label": "기술거래 정보",
+      "source": ["KSTB (기술거래소)", "KIPO 기술이전센터", "대학기술지주"],
+      "primary_key": "deal_id",
+      "fields": {
+        "deal_id":         {"type": "string",  "desc": "거래 고유 ID"},
+        "tech_name":       {"type": "string",  "desc": "기술명"},
+        "licensor":        {"type": "string",  "desc": "기술 공급자 (대학·연구소·기업)"},
+        "licensee":        {"type": "string",  "desc": "기술 수요자"},
+        "deal_type":       {"type": "enum",    "desc": "거래 유형",                         "values": ["전용실시","통상실시","양도","옵션"]},
+        "upfront_fee_krw": {"type": "integer", "desc": "선급 기술료 (원)",                 "nullable": true},
+        "royalty_rate_pct":{"type": "float",   "desc": "경상 기술료율 (%)",                "nullable": true},
+        "deal_date":       {"type": "date",    "desc": "계약 체결일"},
+        "ipc_codes":       {"type": "array",   "desc": "관련 IPC 코드"},
+        "trl_at_deal":     {"type": "integer", "desc": "거래 시점 TRL",                    "nullable": true},
+        "industry":        {"type": "string",  "desc": "산업 분야"}
+      }
+    },
+    "market_info": {
+      "label": "시장 정보",
+      "source": ["KOTRA", "IBISWorld", "Statista", "GII", "KIET"],
+      "primary_key": "market_id",
+      "fields": {
+        "market_id":       {"type": "string",  "desc": "시장 고유 ID"},
+        "market_name":     {"type": "string",  "desc": "시장명"},
+        "industry_code":   {"type": "string",  "desc": "산업 분류 코드 (KSIC/NAICS)"},
+        "tam_usd":         {"type": "float",   "desc": "전체 시장 규모 (USD)"},
+        "cagr_pct":        {"type": "float",   "desc": "연평균 성장률 (%)"},
+        "report_year":     {"type": "integer", "desc": "조사 연도"},
+        "key_players":     {"type": "array",   "desc": "주요 플레이어"},
+        "countries":       {"type": "array",   "desc": "대상 국가"},
+        "segments":        {"type": "object",  "desc": "시장 세그먼트 및 점유율"},
+        "growth_drivers":  {"type": "array",   "desc": "성장 동인"},
+        "entry_barriers":  {"type": "array",   "desc": "진입 장벽"}
+      }
+    },
+    "support_program": {
+      "label": "지원 프로그램 정보",
+      "source": ["중소벤처기업부", "KIAT", "NRF", "IITP", "TIPS", "기보·신보"],
+      "primary_key": "program_id",
+      "fields": {
+        "program_id":      {"type": "string",  "desc": "프로그램 고유 ID"},
+        "program_name":    {"type": "string",  "desc": "지원 사업명"},
+        "agency":          {"type": "string",  "desc": "주관 기관"},
+        "program_type":    {"type": "enum",    "desc": "지원 유형",                         "values": ["R&D","사업화","투자연계","수출","인증","컨설팅"]},
+        "trl_range":       {"type": "array",   "desc": "지원 TRL 범위 [min, max]"},
+        "max_funding_krw": {"type": "integer", "desc": "최대 지원금 (원)"},
+        "match_rate_pct":  {"type": "float",   "desc": "정부 매칭 비율 (%)"},
+        "duration_months": {"type": "integer", "desc": "지원 기간 (개월)"},
+        "target_sector":   {"type": "array",   "desc": "지원 대상 기술 분야"},
+        "deadline":        {"type": "date",    "desc": "신청 마감일",                       "nullable": true},
+        "eligibility":     {"type": "string",  "desc": "신청 자격 요건"},
+        "country":         {"type": "string",  "desc": "국가 코드 (KOR/USA/EU 등)"}
+      }
+    }
+  },
+  "classification_taxonomy": {
+    "tech_field": {
+      "label": "기술 분야 분류",
+      "standard": "국가과학기술표준분류 (KSTIC)",
+      "top_categories": [
+        "정보통신", "바이오·의료", "에너지·환경", "기계·제조", "소재·나노",
+        "농림·수산·식품", "건설·교통", "항공·우주·해양", "안보·국방", "기타"
+      ]
+    },
+    "ipc_mapping": {
+      "label": "IPC → 산업 도메인 매핑",
+      "G06N": "AI·머신러닝",
+      "A01G": "농업기술",
+      "H04L": "통신·네트워킹",
+      "C12N": "바이오테크",
+      "B60L": "전기차·모빌리티",
+      "H01M": "배터리·에너지저장",
+      "G16H": "디지털헬스·의료AI"
+    }
+  },
+  "data_quality_rules": {
+    "completeness_required": ["patent_id", "title", "filing_date", "ipc_codes"],
+    "date_format": "YYYY-MM-DD",
+    "currency_base": "USD (원화 입력 시 /1350 환산)",
+    "dedup_key": "patent_id + country",
+    "refresh_interval": {
+      "patent": "daily",
+      "paper": "weekly",
+      "rd_project": "monthly",
+      "tech_transfer": "weekly",
+      "market_info": "quarterly",
+      "support_program": "monthly"
+    }
+  }
+}

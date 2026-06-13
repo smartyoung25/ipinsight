@@ -19,7 +19,11 @@ from agents import (
     PatentabilityAssessor,
     GlobalIPStrategist, CompetitiveMonitor, PortfolioOptimizer,
     TeamAssessor, UnitEconomicsAssessor, FundingPlanner, RegulatoryRoadmapAgent,
+    IRDeckGenerator, ESGImpactAssessor, TradeSecretAnalyzer, EcosystemMatcher,
+    ExitStrategyDesigner, PatentMaintenanceOptimizer,
+    DemandSurveyGenerator, SMKGenerator,
 )
+from pipeline.roadmap_builder import build_roadmap
 
 app = FastAPI(
     title="IPInsight IP Lifecycle × 글로벌 기술사업화 OS",
@@ -307,6 +311,189 @@ def list_execution_stages():
             {"endpoint": "/execution/regulatory",     "stage": "G8-Reg",     "name": "규제·인증 로드맵",         "gap": "규제 경로"},
         ]
     }
+
+
+# ─────────────────────────────────────────────────────────
+# ② 중기 Gap 보완 모듈 (Medium-term Gaps)
+# ─────────────────────────────────────────────────────────
+
+@app.post("/gap/ir-deck")
+def generate_ir_deck(req: StageRequest):
+    """IR Deck 자동 생성 — 투자자 유형별 12슬라이드 구조 + 피치 스크립트
+    investor_type: vc/cvc/angel/government/strategic"""
+    try:
+        result = IRDeckGenerator().assess(req.input_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"tech_id": req.tech_id, "stage": "G6-IR", "result": result.to_dict()}
+
+
+@app.post("/gap/esg-impact")
+def assess_esg_impact(req: StageRequest):
+    """ESG·사회임팩트 평가 — UN SDG 17개 매핑 + E·S·G 3축 점수 + SROI"""
+    try:
+        result = ESGImpactAssessor().assess(req.input_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"tech_id": req.tech_id, "stage": "G10-ESG", "result": result.to_dict()}
+
+
+@app.post("/gap/trade-secret")
+def analyze_trade_secret(req: StageRequest):
+    """트레이드시크릿 vs 특허 경제성 비교 — 최적 IP 보호 전략 추천
+    tech_type: process/product/software/algorithm/formula"""
+    try:
+        result = TradeSecretAnalyzer().assess(req.input_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"tech_id": req.tech_id, "stage": "G1-TS", "result": result.to_dict()}
+
+
+@app.post("/gap/ecosystem-match")
+def match_ecosystem(req: StageRequest):
+    """생태계 파트너 매칭 — 기업·대학·연구소·VC·AC·정부 6개 카테고리
+    industry_sector: AgriTech/HealthTech/Manufacturing/AI_Software/Energy_CleanTech/BioTech/SmartFarm"""
+    try:
+        result = EcosystemMatcher().assess(req.input_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"tech_id": req.tech_id, "stage": "G3-Eco", "result": result.to_dict()}
+
+
+# ─────────────────────────────────────────────────────────
+# ③ 장기 Gap 보완 모듈 (Long-term Gaps)
+# ─────────────────────────────────────────────────────────
+
+@app.post("/gap/exit-strategy")
+def design_exit_strategy(req: StageRequest):
+    """엑시트 전략 설계 — M&A·IPO·세컨더리·라이선스 5개 시나리오 + MOIC 계산
+    preferred_exit: strategic_ma/financial_ma/ipo/secondary_sale/license_exit"""
+    try:
+        result = ExitStrategyDesigner().assess(req.input_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"tech_id": req.tech_id, "stage": "G10-Exit", "result": result.to_dict()}
+
+
+@app.post("/gap/patent-maintenance")
+def optimize_patent_maintenance(req: StageRequest):
+    """특허 유지비 최적화 — 국가별 갱신료 vs 기술 가치 분석 → 유지·이전·포기 결정
+    input: portfolio (list of patent objects) + annual_budget_usd"""
+    try:
+        result = PatentMaintenanceOptimizer().assess(req.input_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"tech_id": req.tech_id, "stage": "G1-Maint", "result": result.to_dict()}
+
+
+@app.get("/gap/stages")
+def list_gap_stages():
+    """3등급 Gap 보완 모듈 전체 목록"""
+    return {
+        "gap_modules": {
+            "critical_gap_1": [
+                {"endpoint": "/execution/team",           "stage": "G4-Team",    "name": "팀·실행 역량 평가"},
+                {"endpoint": "/execution/unit-economics", "stage": "G5-UE",      "name": "CAC·LTV·Burn Rate"},
+                {"endpoint": "/execution/funding",        "stage": "G2-Funding", "name": "자금조달 시나리오"},
+                {"endpoint": "/execution/regulatory",     "stage": "G8-Reg",     "name": "규제·인증 로드맵"},
+            ],
+            "medium_gap_2": [
+                {"endpoint": "/gap/ir-deck",        "stage": "G6-IR",    "name": "IR Deck 자동 생성"},
+                {"endpoint": "/gap/esg-impact",     "stage": "G10-ESG",  "name": "ESG·SDG 임팩트 평가"},
+                {"endpoint": "/gap/trade-secret",   "stage": "G1-TS",    "name": "트레이드시크릿 vs 특허"},
+                {"endpoint": "/gap/ecosystem-match","stage": "G3-Eco",   "name": "생태계 파트너 매칭"},
+            ],
+            "long_term_gap_3": [
+                {"endpoint": "/gap/exit-strategy",       "stage": "G10-Exit",  "name": "M&A·IPO 엑시트 전략"},
+                {"endpoint": "/gap/patent-maintenance",  "stage": "G1-Maint",  "name": "특허 유지비 최적화"},
+            ],
+        }
+    }
+
+
+# ─────────────────────────────────────────────────────────
+# Layer 3 — 서비스: 수요조사서·SMK·로드맵 자동 생성
+# ─────────────────────────────────────────────────────────
+
+@app.post("/service/demand-survey")
+def generate_demand_survey(req: StageRequest):
+    """수요조사서 자동 생성 — RAG 기반 수요처·도입장벽·파일럿 로드맵 산출
+    industry_sector: AgriTech/HealthTech/Manufacturing/AI_Software/Energy_CleanTech/BioTech"""
+    try:
+        result = DemandSurveyGenerator().assess(req.input_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"tech_id": req.tech_id, "stage": "G0-DS", "result": result.to_dict()}
+
+
+@app.post("/service/smk")
+def generate_smk(req: StageRequest):
+    """SMK(사업화시장키트) 자동 생성 — 경쟁사 비교·GTM 전략·가격·포지셔닝 산출
+    gtm_motion: direct_sales/product_led/partner_led/channel_reseller/community_led"""
+    try:
+        result = SMKGenerator().assess(req.input_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"tech_id": req.tech_id, "stage": "SMK", "result": result.to_dict()}
+
+
+@app.post("/service/roadmap")
+def generate_roadmap(req: StageRequest):
+    """기술사업화 로드맵 자동 생성 — TRL 단계별 마일스톤·자금·KPI·리스크 타임라인"""
+    d = req.input_data
+    try:
+        roadmap = build_roadmap(
+            tech_id      = req.tech_id,
+            tech_name    = d.get("tech_name", req.tech_id),
+            current_trl  = d.get("current_trl", 3),
+            target_trl   = d.get("target_trl", 9),
+            pipeline_results = d.get("pipeline_results", {}),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"tech_id": req.tech_id, "stage": "Roadmap", "roadmap": roadmap}
+
+
+@app.get("/service/stages")
+def list_service_stages():
+    """Layer 3 서비스 단계 목록"""
+    return {
+        "service_modules": [
+            {"endpoint": "/service/demand-survey", "stage": "G0-DS", "output": "수요조사서"},
+            {"endpoint": "/service/smk",           "stage": "SMK",   "output": "사업화시장키트(SMK)"},
+            {"endpoint": "/service/roadmap",        "stage": "Roadmap","output": "기술사업화 로드맵"},
+        ]
+    }
+
+
+# ─────────────────────────────────────────────────────────
+# Layer 4 — 검증: PoC 체크리스트 실행
+# ─────────────────────────────────────────────────────────
+
+@app.get("/verify/poc")
+def run_poc_verification():
+    """PoC 검증 체크리스트 실행 — 14개 항목 자동 검증 + 결과 JSON 반환"""
+    try:
+        from deploy.poc_checklist import PoCVerifier
+        verifier = PoCVerifier(base_url="http://localhost:8100")
+        report   = verifier.run_all()
+        verifier.save_report()
+        return {
+            "poc_summary": {
+                "total":     report.total,
+                "passed":    report.passed,
+                "failed":    report.failed,
+                "warned":    report.warned,
+                "pass_rate": report.pass_rate,
+            },
+            "items": [
+                {"category": i.category, "name": i.name, "status": i.status,
+                 "detail": i.detail, "ms": i.duration_ms}
+                for i in report.items
+            ],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/demo/sample-input")

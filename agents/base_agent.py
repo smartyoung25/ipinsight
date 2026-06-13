@@ -66,6 +66,14 @@ class BaseAgent:
         except Exception:
             return self._rule_fallback(prompt)
 
+    def _rag(self, query: str, top_k: int = 5, source_filter: str = "") -> str:
+        """RAG 검색 — knowledge/*.json 벡터 인덱스에서 관련 컨텍스트 반환"""
+        try:
+            from pipeline.rag_retriever import rag_search
+            return rag_search(query, top_k=top_k, source_filter=source_filter)
+        except Exception:
+            return ""
+
     def _rule_fallback(self, prompt: str) -> str:
         return f"[규칙기반 폴백] {self.stage_name} 분석 완료. LLM 키 설정 시 상세 분석 가능."
 
