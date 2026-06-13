@@ -142,14 +142,63 @@ class TestESGConnector:
         assert "data_quality"  in result
 
 
+# ─── RegionalConnector ───────────────────────────────────
+class TestRegionalConnector:
+    def setup_method(self):
+        from pipeline.connectors.regional_connector import RegionalConnector
+        self.rc = RegionalConnector()
+
+    def test_analyze_kr_us_eu(self):
+        ctx = self.rc.analyze(["KR", "US", "DE"], "agritech")
+        d = ctx.to_dict()
+        assert "regions" in d
+        assert "ip" in d
+        assert "regulatory" in d
+        assert "funding" in d
+        assert "gtm" in d
+        assert "esg" in d
+        assert "priority" in d
+
+    def test_analyze_includes_dev(self):
+        ctx = self.rc.analyze(["KR", "VN", "NG", "BR"], "agritech")
+        d = ctx.to_dict()
+        assert "DEV" in d["regions"]["classified"]
+
+    def test_priority_sorted(self):
+        ctx = self.rc.analyze(["KR", "US", "VN"], "software_saas")
+        scores = [p["entry_score"] for p in ctx.priority]
+        assert scores == sorted(scores, reverse=True)
+
+    def test_dev_country_detail(self):
+        result = self.rc.dev_country_detail("VN", "agritech")
+        assert "country" in result
+        assert result["country"] == "VN"
+        assert "leapfrog" in result
+
+    def test_patent_filing_strategy(self):
+        result = self.rc.patent_filing_strategy(["KR", "US", "EU", "VN"], budget_usd=30_000)
+        assert "recommended_order" in result
+        assert "total_cost_usd" in result
+        assert "pct_first" in result
+        assert result["pct_first"] is True
+
+    def test_classify_regions(self):
+        from pipeline.connectors.regional_connector import classify_regions
+        result = classify_regions(["KR", "US", "DE", "VN", "NG"])
+        assert "KR" in result
+        assert "US" in result
+        assert "EU" in result
+        assert "DEV" in result
+
+
 # ─── CodeLinkerPipeline 통합 테스트 ──────────────────────
 class TestCodeLinkerPhase1Integration:
-    def test_context_has_phase1_fields(self):
+    def test_context_has_all_fields(self):
         from pipeline.code_linker import CodeLinkerPipeline
         pipeline = CodeLinkerPipeline()
         ctx = pipeline.run("TEST-P1", {
             "cpc_codes":        ["A01G"],
-            "target_markets":   ["KR"],
+            "target_markets":   ["KR", "US", "VN"],
             "tech_type":        "agritech",
             "industry_keyword": "agriculture",
             "tech_name":        "smart farm sensor",
@@ -160,10 +209,16 @@ class TestCodeLinkerPhase1Integration:
         assert "market"   in d, "market 필드 누락"
         assert "clinical" in d, "clinical 필드 누락"
         assert "esg"      in d, "esg 필드 누락"
+        assert "regional" in d, "regional 필드 누락 (4개 지역 통합)"
 
-    def test_context_11_fields(self):
+    def test_context_fields(self):
         from pipeline.code_linker import CodeContext
         ctx = CodeContext(tech_id="X")
         keys = [k for k in ctx.to_dict().keys()]
-        # tech_id(1) + 7개 기존 + 4개 Phase1 = 12개
-        assert len(keys) == 12, f"예상 12개 필드, 실제 {len(keys)}개: {keys}"
+        # tech_id(1) + 7개 기존 + 4개 Phase1 + 1개 regional = 13개
+        assert len(keys) == 13, f"예상 13개 필드, 실제 {len(keys)}개: {keys}"
+
+    def test_context_has_regional_field(self):
+        from pipeline.code_linker import CodeContext
+        ctx = CodeContext(tech_id="X")
+        assert "regional" in ctx.to_dict(), "regional 필드 누락"

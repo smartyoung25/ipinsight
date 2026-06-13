@@ -1,216 +1,890 @@
 {
-  "description": "주요 10개국 시장환경·IP강도·규제 기초 데이터 (GlobalIPStrategist 활용)",
+  "description": "30개국+ 시장환경·IP강도·규제 기초 데이터 — KR·US·EU·개발도상국 전면 커버 (2026-06)",
   "last_updated": "2026-06",
+  "regions": ["북미", "유럽", "동아시아", "동남아시아", "남아시아", "중동·북아프리카", "사하라이남아프리카", "중남미"],
   "countries": [
     {
+      "code": "KOR",
+      "iso2": "KR",
+      "name": "대한민국",
+      "region": "동아시아",
+      "gdp_usd_bn": 1709,
+      "ip_environment": {
+        "ip_score": 75,
+        "patent_system": "선출원주의 (AIA 동일)",
+        "patent_office": "KIPO",
+        "enforcement": "강함",
+        "avg_grant_months": 14,
+        "annual_filing_count": 230000,
+        "utility_model": true,
+        "key_treaties": ["PCT", "Paris Convention", "Madrid Protocol"]
+      },
+      "market_attractiveness": {
+        "tier": 1,
+        "vc_ecosystem": "발달 (판교·강남 스타트업 벨트)",
+        "tech_sectors": ["반도체", "디스플레이", "스마트팜", "배터리", "K-바이오"],
+        "gov_rd_pct_gdp": 4.9,
+        "unicorns": 23
+      },
+      "regulatory_burden": "중간 — 스마트농업법·의료기기법·ISMS-P",
+      "key_programs": ["TIPS", "창업패키지", "KIBO 기보", "KIAT"],
+      "market_entry_note": "대기업 CVC(삼성·현대·LG·SK) 공급망 진입이 가장 효과적",
+      "language": "한국어 필수",
+      "oda_role": "공여국 — KOICA 개도국 스마트팜 ODA 지원"
+    },
+    {
       "code": "USA",
+      "iso2": "US",
       "name": "미국",
       "region": "북미",
       "gdp_usd_bn": 27360,
       "ip_environment": {
         "ip_score": 90,
-        "patent_system": "선발명주의 → AIA(2013) 선출원주의 전환",
+        "patent_system": "선출원주의 (AIA 2013)",
+        "patent_office": "USPTO",
         "enforcement": "매우 강함 (ITC·USDC·PTAB)",
         "avg_grant_months": 24,
-        "annual_filing_count": 650000
+        "annual_filing_count": 650000,
+        "utility_model": false,
+        "key_treaties": ["PCT", "Paris Convention", "TRIPS"]
       },
       "market_attractiveness": {
         "tier": 1,
         "vc_ecosystem": "매우 발달 (실리콘밸리·보스턴·뉴욕)",
         "tech_sectors": ["AI", "반도체", "바이오", "클린테크", "SaaS"],
-        "regulatory_burden": "중간"
+        "gov_rd_pct_gdp": 3.5,
+        "unicorns": 700
       },
-      "key_certifications": ["FDA 510(k)", "FCC", "UL", "ISO"],
-      "filing_cost_usd": 12000
+      "regulatory_burden": "높음 — FDA·USDA·EPA·FCC 분산, 주별 차이",
+      "key_programs": ["SBIR/STTR", "NSF I-Corps", "ARPA-E", "DOE LPO"],
+      "market_entry_note": "PLG→ENT 또는 DoD 조달. VC 덜 선택적인 틈새시장 먼저",
+      "language": "영어",
+      "dfi_programs": ["DFC", "USAID DIV", "Power Africa"]
     },
     {
-      "code": "EU",
-      "name": "유럽연합 (EPO)",
+      "code": "DEU",
+      "iso2": "DE",
+      "name": "독일",
       "region": "유럽",
-      "gdp_usd_bn": 18350,
+      "gdp_usd_bn": 4456,
       "ip_environment": {
         "ip_score": 85,
-        "patent_system": "EPO 유럽 특허 + UPC(2023 단일 특허법원)",
-        "enforcement": "강함 (UPC 이후 통합 집행)",
+        "patent_system": "EPO + UPC (2023)",
+        "patent_office": "DPMA + EPO",
+        "enforcement": "강함 (UPC 단일법원)",
         "avg_grant_months": 36,
-        "annual_filing_count": 193000
+        "annual_filing_count": 60000,
+        "utility_model": true,
+        "key_treaties": ["EPC", "PCT", "Madrid Protocol"]
       },
       "market_attractiveness": {
         "tier": 1,
-        "vc_ecosystem": "발달 (베를린·런던·파리·스톡홀름)",
-        "tech_sectors": ["그린테크", "모빌리티", "헬스케어", "스마트팜"],
-        "regulatory_burden": "높음 (GDPR·CE 등)"
+        "vc_ecosystem": "발달 (베를린·뮌헨)",
+        "tech_sectors": ["자동차테크", "산업AI", "그린수소", "정밀제조", "AgriTech"],
+        "gov_rd_pct_gdp": 3.1,
+        "unicorns": 35
       },
-      "key_certifications": ["CE Mark", "ISO 9001", "REACH", "MDR"],
-      "filing_cost_usd": 15000
+      "regulatory_burden": "높음 — CE Mark + GDPR + AI Act",
+      "key_programs": ["ZIM (중소기업혁신)", "EXIST (창업보조금)", "Fraunhofer 연계"],
+      "market_entry_note": "Fraunhofer·TU Berlin 등 TLO 파트너십이 가장 빠른 진입"
     },
     {
-      "code": "CHN",
-      "name": "중국",
-      "region": "동아시아",
-      "gdp_usd_bn": 17790,
+      "code": "FRA",
+      "iso2": "FR",
+      "name": "프랑스",
+      "region": "유럽",
+      "gdp_usd_bn": 3031,
       "ip_environment": {
-        "ip_score": 65,
-        "patent_system": "발명특허·실용신안·디자인 3원 체계",
-        "enforcement": "개선 중 (지식재산법원 설립)",
-        "avg_grant_months": 18,
-        "annual_filing_count": 1580000
+        "ip_score": 83,
+        "patent_system": "EPO + UPC",
+        "patent_office": "INPI + EPO",
+        "enforcement": "강함",
+        "avg_grant_months": 36,
+        "annual_filing_count": 16000,
+        "utility_model": false
       },
       "market_attractiveness": {
         "tier": 1,
-        "vc_ecosystem": "발달 (베이징·상하이·선전)",
-        "tech_sectors": ["AI", "전기차", "반도체", "5G", "스마트팜"],
-        "regulatory_burden": "높음 (데이터현지화·외자규제)"
+        "vc_ecosystem": "발달 (Paris Station F)",
+        "tech_sectors": ["에너지전환", "럭셔리테크", "농식품", "방위산업"],
+        "gov_rd_pct_gdp": 2.2
       },
-      "key_certifications": ["CCC", "NMPA", "SAMR"],
-      "filing_cost_usd": 5000
+      "regulatory_burden": "높음 — CE + GDPR + AI Act",
+      "key_programs": ["BPI France (공공투자은행)", "French Tech 비자", "EIC Accelerator"]
+    },
+    {
+      "code": "GBR",
+      "iso2": "GB",
+      "name": "영국",
+      "region": "유럽",
+      "gdp_usd_bn": 3089,
+      "ip_environment": {
+        "ip_score": 84,
+        "patent_system": "UKIPO (Brexit 후 독자 시스템 + EPO 잔류)",
+        "patent_office": "UKIPO",
+        "enforcement": "강함 (Unified Patents Court 비참여)",
+        "avg_grant_months": 30,
+        "annual_filing_count": 22000,
+        "utility_model": false
+      },
+      "market_attractiveness": {
+        "tier": 1,
+        "vc_ecosystem": "발달 (London·Edinburgh)",
+        "tech_sectors": ["핀테크", "바이오", "클라이밋테크", "딥테크"],
+        "gov_rd_pct_gdp": 1.7
+      },
+      "regulatory_burden": "중간 — UKCA Mark (Brexit 후), ICO 데이터보호",
+      "key_programs": ["Innovate UK (최대 £2M)", "UKRI SBRI", "Future Fund"]
+    },
+    {
+      "code": "NLD",
+      "iso2": "NL",
+      "name": "네덜란드",
+      "region": "유럽",
+      "gdp_usd_bn": 1118,
+      "ip_environment": {
+        "ip_score": 82,
+        "patent_system": "EPO + UPC",
+        "patent_office": "BOIP + EPO",
+        "enforcement": "강함",
+        "avg_grant_months": 36,
+        "utility_model": false
+      },
+      "market_attractiveness": {
+        "tier": 1,
+        "vc_ecosystem": "중간 (Amsterdam·Eindhoven)",
+        "tech_sectors": ["스마트팜 (WUR 세계 1위)", "물관리", "반도체(ASML)", "물류"],
+        "gov_rd_pct_gdp": 2.3
+      },
+      "regulatory_burden": "높음 — CE + GDPR",
+      "key_programs": ["NWO (네덜란드 연구위원회)", "RVO (혁신보조금)", "StartupDelta"],
+      "market_entry_note": "스마트팜 분야 세계 선도 — WUR(Wageningen) 협력이 필수"
+    },
+    {
+      "code": "SWE",
+      "iso2": "SE",
+      "name": "스웨덴",
+      "region": "유럽",
+      "gdp_usd_bn": 593,
+      "ip_environment": {
+        "ip_score": 86,
+        "patent_system": "EPO + UPC",
+        "patent_office": "PRV + EPO",
+        "enforcement": "강함",
+        "avg_grant_months": 36,
+        "utility_model": false
+      },
+      "market_attractiveness": {
+        "tier": 1,
+        "vc_ecosystem": "발달 (Stockholm 1인당 유니콘 세계 2위)",
+        "tech_sectors": ["클라이밋테크", "게임", "핀테크", "무선통신"],
+        "gov_rd_pct_gdp": 3.4
+      },
+      "regulatory_burden": "높음 — CE + GDPR",
+      "key_programs": ["Vinnova (혁신청)", "EIC Accelerator", "Almi Invest"]
     },
     {
       "code": "JPN",
+      "iso2": "JP",
       "name": "일본",
       "region": "동아시아",
       "gdp_usd_bn": 4213,
       "ip_environment": {
         "ip_score": 80,
-        "patent_system": "선출원주의, 심사청구제",
-        "enforcement": "강함 (지적재산고등재판소)",
-        "avg_grant_months": 20,
-        "annual_filing_count": 289000
+        "patent_system": "선출원주의 (특허청 JPO)",
+        "patent_office": "JPO",
+        "enforcement": "강함",
+        "avg_grant_months": 14,
+        "annual_filing_count": 290000,
+        "utility_model": true
       },
       "market_attractiveness": {
-        "tier": 2,
-        "vc_ecosystem": "발달 (도쿄·오사카)",
-        "tech_sectors": ["로보틱스", "반도체 소재", "정밀기기", "스마트팜"],
-        "regulatory_burden": "중간"
+        "tier": 1,
+        "vc_ecosystem": "중간 (도쿄·오사카)",
+        "tech_sectors": ["로봇", "자동차", "반도체 소재", "AgriTech", "의료기기"],
+        "gov_rd_pct_gdp": 3.3
       },
-      "key_certifications": ["PMDA (의료기기)", "PSE", "JIS"],
-      "filing_cost_usd": 8000
+      "regulatory_burden": "높음 — MHLW(의료)·MAFF(농업)·MIC(정보)",
+      "key_programs": ["JST (과학기술진흥기구)", "NEDO (에너지산업개발기구)", "STS 창업지원"],
+      "market_entry_note": "현지 대기업 파트너십(파나소닉·후지쯔·NTT) 필수, 단독 진입 어려움",
+      "oda_role": "공여국 — JICA 개도국 스마트농업 지원"
     },
     {
-      "code": "KOR",
-      "name": "한국",
+      "code": "CHN",
+      "iso2": "CN",
+      "name": "중국",
       "region": "동아시아",
-      "gdp_usd_bn": 1713,
+      "gdp_usd_bn": 17795,
       "ip_environment": {
-        "ip_score": 78,
-        "patent_system": "선출원주의, 심사청구제 (KR 특허청)",
-        "enforcement": "강함 (특허법원)",
-        "avg_grant_months": 14,
-        "annual_filing_count": 237000
+        "ip_score": 55,
+        "patent_system": "선출원주의 (CNIPA)",
+        "patent_office": "CNIPA",
+        "enforcement": "개선 중 (IP 법원 신설), 실용신안 남용 주의",
+        "avg_grant_months": 22,
+        "annual_filing_count": 1600000,
+        "utility_model": true
       },
       "market_attractiveness": {
-        "tier": 2,
-        "vc_ecosystem": "발달 (서울·판교)",
-        "tech_sectors": ["반도체", "디스플레이", "AI", "스마트팜", "바이오"],
-        "regulatory_burden": "중간"
+        "tier": 1,
+        "vc_ecosystem": "매우 발달 (베이징·상하이·선전)",
+        "tech_sectors": ["AI", "전기차", "드론 AgriTech", "바이오", "재생에너지"],
+        "gov_rd_pct_gdp": 2.5
       },
-      "key_certifications": ["KC인증", "식품의약품안전처(MFDS)", "KOSHA"],
-      "filing_cost_usd": 3000
+      "regulatory_burden": "매우 높음 — SAMR·CAMA·데이터현지화법(MLPS)",
+      "market_entry_note": "합작법인(JV) 또는 현지 파트너 필수. 기술 유출 리스크 관리 필수",
+      "caution": "지재권 분쟁, 기술 강제 이전, 데이터 국경 리스크"
     },
     {
       "code": "SGP",
+      "iso2": "SG",
       "name": "싱가포르",
       "region": "동남아시아",
-      "gdp_usd_bn": 516,
+      "gdp_usd_bn": 497,
       "ip_environment": {
-        "ip_score": 82,
-        "patent_system": "영미법 기반, IPOS (지식재산청)",
-        "enforcement": "강함",
-        "avg_grant_months": 24,
-        "annual_filing_count": 10000
-      },
-      "market_attractiveness": {
-        "tier": 3,
-        "vc_ecosystem": "발달 (ASEAN 허브)",
-        "tech_sectors": ["핀테크", "생명공학", "스마트시티", "애그테크"],
-        "regulatory_burden": "낮음"
-      },
-      "key_certifications": ["HSA (의약품)", "CAAS (항공)", "EMA"],
-      "filing_cost_usd": 4000
-    },
-    {
-      "code": "ISR",
-      "name": "이스라엘",
-      "region": "중동",
-      "gdp_usd_bn": 521,
-      "ip_environment": {
-        "ip_score": 75,
-        "patent_system": "선출원주의, IL 특허청",
-        "enforcement": "강함",
+        "ip_score": 78,
+        "patent_system": "선출원주의 (IPOS)",
+        "patent_office": "IPOS",
+        "enforcement": "강함 (영미법 기반, 영어)",
         "avg_grant_months": 30,
-        "annual_filing_count": 9500
+        "annual_filing_count": 11000,
+        "utility_model": false
       },
       "market_attractiveness": {
-        "tier": 3,
-        "vc_ecosystem": "매우 발달 (스타트업 네이션, Yozma 모델)",
-        "tech_sectors": ["사이버보안", "AgriTech", "의료기기", "AI·딥테크"],
-        "regulatory_burden": "중간"
+        "tier": 1,
+        "vc_ecosystem": "발달 (ASEAN 허브)",
+        "tech_sectors": ["핀테크", "AgriTech", "스마트시티", "바이오"],
+        "gov_rd_pct_gdp": 2.0
       },
-      "key_certifications": ["MOH (보건부)", "ICTS"],
-      "filing_cost_usd": 4500
+      "regulatory_burden": "낮음 — 친사업 규제, EDB 원스톱",
+      "key_programs": ["NRF T2i (기술이전)", "ESG (엔터프라이즈 싱가포르)", "SEEDS Capital"],
+      "market_entry_note": "동남아 허브 — 싱가포르 설립 후 ASEAN 확장 전략 권장"
     },
     {
-      "code": "IND",
-      "name": "인도",
-      "region": "남아시아",
-      "gdp_usd_bn": 3570,
+      "code": "VNM",
+      "iso2": "VN",
+      "name": "베트남",
+      "region": "동남아시아",
+      "gdp_usd_bn": 430,
+      "gdp_growth_pct": 6.5,
+      "population_mn": 98,
       "ip_environment": {
-        "ip_score": 55,
-        "patent_system": "영국법 기반, IPO (인도 특허청)",
-        "enforcement": "보통 (개선 중)",
-        "avg_grant_months": 48,
-        "annual_filing_count": 62000
+        "ip_score": 38,
+        "patent_system": "선출원주의 (NOIP)",
+        "patent_office": "NOIP (지식재산청)",
+        "enforcement": "약함~중간 (개선 중)",
+        "avg_grant_months": 36,
+        "annual_filing_count": 8000,
+        "utility_model": true
       },
       "market_attractiveness": {
         "tier": 2,
-        "vc_ecosystem": "성장 중 (벵갈루루·뭄바이·델리)",
-        "tech_sectors": ["IT서비스", "애그테크", "헬스테크", "핀테크"],
-        "regulatory_burden": "높음"
+        "vc_ecosystem": "성장 중 (호치민·하노이)",
+        "tech_sectors": ["AgriTech (쌀·커피·수산)", "제조 이전", "핀테크", "에듀테크"],
+        "middle_class_mn": 33,
+        "smartphone_penetration_pct": 73
       },
-      "key_certifications": ["BIS", "CDSCO (의약품)", "AERB"],
-      "filing_cost_usd": 3000
+      "regulatory_burden": "중간 — 농업부(MARD)·과기부(MOST)·DAV(의약)",
+      "key_programs": ["NATIF (국가기술혁신기금)", "National Technology Innovation Program"],
+      "market_entry_note": "농업 디지털화 국가목표(2025 30%). 글로벌 공급망 편입 기회",
+      "dev_finance": ["ADB", "World Bank IDA", "JICA", "KOICA"],
+      "leapfrog_sectors": ["정밀농업", "오프그리드 태양광", "핀테크"]
     },
     {
-      "code": "AUS",
-      "name": "호주",
-      "region": "오세아니아",
-      "gdp_usd_bn": 1723,
+      "code": "IDN",
+      "iso2": "ID",
+      "name": "인도네시아",
+      "region": "동남아시아",
+      "gdp_usd_bn": 1320,
+      "gdp_growth_pct": 5.0,
+      "population_mn": 276,
       "ip_environment": {
-        "ip_score": 78,
-        "patent_system": "영미법 기반, IP Australia",
-        "enforcement": "강함",
-        "avg_grant_months": 24,
-        "annual_filing_count": 29000
+        "ip_score": 36,
+        "patent_system": "선출원주의 (DGIP)",
+        "patent_office": "DGIP (지식재산총국)",
+        "enforcement": "약함",
+        "avg_grant_months": 42,
+        "annual_filing_count": 9000,
+        "utility_model": true
+      },
+      "market_attractiveness": {
+        "tier": 2,
+        "vc_ecosystem": "성장 중 (자카르타 — 동남아 최대 스타트업 국가)",
+        "tech_sectors": ["e-커머스", "핀테크", "AgriTech", "에너지"],
+        "middle_class_mn": 52,
+        "smartphone_penetration_pct": 68
+      },
+      "regulatory_burden": "높음 — 산업부·농업부·BPOM(식약처)·Kominfo(데이터현지화)",
+      "key_programs": ["LPDP (교육기금)", "BKPM (투자조정청) 인센티브"],
+      "market_entry_note": "4천개 섬 물류 제약. 농업협동조합(Koperasi) 채널 활용 권장",
+      "dev_finance": ["ADB", "World Bank IDA", "IFC"],
+      "leapfrog_sectors": ["오프그리드 에너지", "모바일결제", "정밀농업"]
+    },
+    {
+      "code": "THA",
+      "iso2": "TH",
+      "name": "태국",
+      "region": "동남아시아",
+      "gdp_usd_bn": 513,
+      "gdp_growth_pct": 2.5,
+      "population_mn": 72,
+      "ip_environment": {
+        "ip_score": 40,
+        "patent_system": "선출원주의 (DIP)",
+        "patent_office": "DIP (지식재산국)",
+        "enforcement": "중간",
+        "avg_grant_months": 60,
+        "utility_model": true
+      },
+      "market_attractiveness": {
+        "tier": 2,
+        "vc_ecosystem": "중간 (방콕)",
+        "tech_sectors": ["자동차(EV 생산기지)", "AgriTech (쌀·고무·수산)", "의료관광"],
+        "smartphone_penetration_pct": 80
+      },
+      "regulatory_burden": "중간 — FDA(식품의약)·MOAC(농업)·BOI(투자청 인센티브)",
+      "market_entry_note": "BOI 투자인센티브(세금감면) 적극 활용. EV·스마트팜 우선",
+      "dev_finance": ["ADB", "World Bank"]
+    },
+    {
+      "code": "PHL",
+      "iso2": "PH",
+      "name": "필리핀",
+      "region": "동남아시아",
+      "gdp_usd_bn": 437,
+      "gdp_growth_pct": 6.0,
+      "population_mn": 115,
+      "ip_environment": {
+        "ip_score": 35,
+        "patent_system": "선출원주의 (IPO PH)",
+        "enforcement": "약함~중간",
+        "avg_grant_months": 48,
+        "utility_model": true
+      },
+      "market_attractiveness": {
+        "tier": 2,
+        "tech_sectors": ["BPO", "핀테크", "AgriTech", "원격의료"],
+        "smartphone_penetration_pct": 76,
+        "english_proficiency": "높음 (영어 공용어)"
+      },
+      "regulatory_burden": "중간 — DA(농업)·FDA(식의약)·DTI(투자)",
+      "dev_finance": ["ADB (본부 위치)", "World Bank IDA", "USAID"],
+      "market_entry_note": "영어 가능 + BPO 기반 IT 인력 풍부. 농업 생산성 개선 수요 높음"
+    },
+    {
+      "code": "MYS",
+      "iso2": "MY",
+      "name": "말레이시아",
+      "region": "동남아시아",
+      "gdp_usd_bn": 399,
+      "gdp_growth_pct": 4.5,
+      "population_mn": 34,
+      "ip_environment": {
+        "ip_score": 45,
+        "patent_system": "선출원주의 (MyIPO)",
+        "enforcement": "중간",
+        "avg_grant_months": 36,
+        "utility_model": true
+      },
+      "market_attractiveness": {
+        "tier": 2,
+        "tech_sectors": ["반도체 후공정", "팜오일 AgriTech", "이슬람 핀테크", "데이터센터"],
+        "gov_rd_pct_gdp": 1.4
+      },
+      "regulatory_burden": "중간 — MAQIS(농업검역)·MDA(의약)·MCMC(통신)",
+      "market_entry_note": "이슬람 금융 + 할랄 인증 연계 필수. 반도체 공급망 편입 기회"
+    },
+    {
+      "code": "IND",
+      "iso2": "IN",
+      "name": "인도",
+      "region": "남아시아",
+      "gdp_usd_bn": 3500,
+      "gdp_growth_pct": 7.0,
+      "population_mn": 1430,
+      "ip_environment": {
+        "ip_score": 42,
+        "patent_system": "선출원주의 (CGPDTM)",
+        "patent_office": "CGPDTM (IPO India)",
+        "enforcement": "중간 (개선 중)",
+        "avg_grant_months": 48,
+        "annual_filing_count": 70000,
+        "utility_model": false,
+        "compulsory_license_risk": "있음 (의약품 분야 실적)"
+      },
+      "market_attractiveness": {
+        "tier": 2,
+        "vc_ecosystem": "발달 (벵갈루루·뭄바이·델리)",
+        "tech_sectors": ["AI/SaaS", "애그리테크", "제약·바이오시밀러", "핀테크", "재생에너지"],
+        "unicorns": 110,
+        "middle_class_mn": 300
+      },
+      "regulatory_burden": "높음 — CDSCO(의료기기)·FSSAI(식품)·BIS(표준)·DPDP Act(데이터)",
+      "key_programs": ["Startup India", "Make in India", "BIRAC (바이오)", "SIDBI"],
+      "market_entry_note": "Tier-2/3 도시 미서비스 시장 거대. 현지화·저가 모델 필수",
+      "dev_finance": ["World Bank", "ADB", "USAID DIV"]
+    },
+    {
+      "code": "BGD",
+      "iso2": "BD",
+      "name": "방글라데시",
+      "region": "남아시아",
+      "gdp_usd_bn": 460,
+      "gdp_growth_pct": 6.0,
+      "population_mn": 170,
+      "ip_environment": {
+        "ip_score": 28,
+        "patent_system": "선출원주의 (DPDT)",
+        "enforcement": "약함",
+        "avg_grant_months": 60,
+        "utility_model": false
       },
       "market_attractiveness": {
         "tier": 3,
-        "vc_ecosystem": "발달 (시드니·멜버른)",
-        "tech_sectors": ["광업·자원", "AgriTech", "헬스케어", "클린에너지"],
-        "regulatory_burden": "중간"
+        "tech_sectors": ["의류·제조 IT", "모바일금융(bKash)", "농업ICT", "기후적응"],
+        "smartphone_penetration_pct": 50
       },
-      "key_certifications": ["TGA (의료기기)", "RCM", "ACMA"],
-      "filing_cost_usd": 6000
+      "regulatory_burden": "중간 — DGDA(의약)·DAE(농업확장)",
+      "dev_finance": ["World Bank IDA", "ADB", "JICA", "UKAID"],
+      "market_entry_note": "bKash 핀테크 생태계 연계. 기후취약 → 적응기술 수요",
+      "ldc_status": true,
+      "leapfrog_sectors": ["모바일금융", "오프그리드 태양광", "기후적응 농업"]
+    },
+    {
+      "code": "EGY",
+      "iso2": "EG",
+      "name": "이집트",
+      "region": "중동·북아프리카",
+      "gdp_usd_bn": 395,
+      "gdp_growth_pct": 4.0,
+      "population_mn": 106,
+      "ip_environment": {
+        "ip_score": 32,
+        "patent_system": "선출원주의 (EGPO)",
+        "patent_office": "EGPO (이집트 특허청)",
+        "enforcement": "약함~중간",
+        "avg_grant_months": 48,
+        "utility_model": false
+      },
+      "market_attractiveness": {
+        "tier": 3,
+        "vc_ecosystem": "성장 중 (카이로)",
+        "tech_sectors": ["핀테크", "에듀테크", "AgriTech", "재생에너지"],
+        "strategic_position": "MENA 관문 + 아프리카 북부 허브"
+      },
+      "regulatory_burden": "높음 — NTRA(통신)·CAPMAS(통계)·MOA(농업)",
+      "key_programs": ["이집트 벤처 (EVF)", "수에즈 경제특구"],
+      "dev_finance": ["World Bank", "AfDB", "EIB", "GCF", "IFC"],
+      "market_entry_note": "수에즈 경제특구 입주 + MENA 수출 거점 활용 가능"
+    },
+    {
+      "code": "ARE",
+      "iso2": "AE",
+      "name": "아랍에미리트",
+      "region": "중동·북아프리카",
+      "gdp_usd_bn": 499,
+      "gdp_growth_pct": 4.0,
+      "population_mn": 10,
+      "ip_environment": {
+        "ip_score": 62,
+        "patent_system": "선출원주의 (MOEC)",
+        "patent_office": "MOEC + GCC 특허청",
+        "enforcement": "중간~강함 (두바이 국제법원 영어)",
+        "avg_grant_months": 24,
+        "utility_model": false
+      },
+      "market_attractiveness": {
+        "tier": 2,
+        "vc_ecosystem": "성장 중 (두바이·아부다비)",
+        "tech_sectors": ["핀테크", "스마트시티", "수직농장", "클린테크"],
+        "food_import_dependency_pct": 90
+      },
+      "regulatory_burden": "낮음~중간 — 무료구역(DIFC·ADGM) 친사업",
+      "key_programs": ["Hub71 (아부다비 테크허브)", "DIFC Fintech Hive", "이슬람 개발은행(IsDB)"],
+      "market_entry_note": "식량 수입 의존도 90% → 수직농장·정밀농업 수요 매우 높음. 중동 허브"
+    },
+    {
+      "code": "SAU",
+      "iso2": "SA",
+      "name": "사우디아라비아",
+      "region": "중동·북아프리카",
+      "gdp_usd_bn": 1062,
+      "gdp_growth_pct": 2.5,
+      "population_mn": 36,
+      "ip_environment": {
+        "ip_score": 58,
+        "patent_system": "선출원주의 (SAIP)",
+        "patent_office": "SAIP + GCC",
+        "enforcement": "중간",
+        "avg_grant_months": 30,
+        "utility_model": false
+      },
+      "market_attractiveness": {
+        "tier": 2,
+        "vc_ecosystem": "성장 중 (리야드)",
+        "tech_sectors": ["재생에너지", "수직농장", "디지털 정부", "엔터테인먼트"],
+        "vision2030_sectors": ["관광", "엔터", "재생에너지", "국방", "스마트팜"]
+      },
+      "regulatory_burden": "중간 — SFDA(식의약)·MOA(농업)·CITC(통신)",
+      "key_programs": ["Vision 2030 투자펀드(PIF)", "Wa'ed (아람코 스타트업)"],
+      "dev_finance": ["IsDB", "SFD (사우디 개발기금)"],
+      "market_entry_note": "Vision 2030 사업 연계가 필수. 현지화(사우다이제이션) 요건"
+    },
+    {
+      "code": "MAR",
+      "iso2": "MA",
+      "name": "모로코",
+      "region": "중동·북아프리카",
+      "gdp_usd_bn": 134,
+      "gdp_growth_pct": 3.5,
+      "population_mn": 38,
+      "ip_environment": {
+        "ip_score": 35,
+        "patent_system": "OAPI 회원 + OMPIC",
+        "patent_office": "OMPIC",
+        "enforcement": "약함",
+        "utility_model": false
+      },
+      "market_attractiveness": {
+        "tier": 3,
+        "tech_sectors": ["태양광(누르 사막)", "AgriTech (수출원예)", "오프쇼어링", "관광"],
+        "strategic_position": "아프리카·EU 연결 허브"
+      },
+      "dev_finance": ["World Bank", "AfDB", "EIB", "AFD"],
+      "market_entry_note": "누르 태양광 프로젝트(세계 최대급) 연계 클린테크 기회"
+    },
+    {
+      "code": "NGA",
+      "iso2": "NG",
+      "name": "나이지리아",
+      "region": "사하라이남아프리카",
+      "gdp_usd_bn": 477,
+      "gdp_growth_pct": 3.3,
+      "population_mn": 218,
+      "ip_environment": {
+        "ip_score": 25,
+        "patent_system": "선출원주의 (FIPO)",
+        "patent_office": "FIPO (연방지식재산청)",
+        "enforcement": "약함",
+        "avg_grant_months": 60,
+        "utility_model": false
+      },
+      "market_attractiveness": {
+        "tier": 3,
+        "vc_ecosystem": "성장 중 (라고스 테크허브)",
+        "tech_sectors": ["핀테크(Flutterwave)", "AgriTech", "에너지접근", "헬스테크"],
+        "youth_population_pct": 60
+      },
+      "regulatory_burden": "높음 — NAFDAC(식의약)·FMARD(농업)·NCC(통신)·SEC",
+      "key_programs": ["NITDA (디지털개발)", "Bank of Agriculture (BOA)"],
+      "dev_finance": ["AfDB", "World Bank IDA", "IFC", "USAID"],
+      "market_entry_note": "아프리카 최대 인구+경제. 라고스 핀테크 허브 거점 활용",
+      "leapfrog_sectors": ["모바일결제", "오프그리드 에너지", "정밀농업"]
+    },
+    {
+      "code": "KEN",
+      "iso2": "KE",
+      "name": "케냐",
+      "region": "사하라이남아프리카",
+      "gdp_usd_bn": 118,
+      "gdp_growth_pct": 5.5,
+      "population_mn": 56,
+      "ip_environment": {
+        "ip_score": 30,
+        "patent_system": "ARIPO 회원 (아프리카 지역특허)",
+        "patent_office": "KEPHIS + ARIPO",
+        "enforcement": "약함",
+        "avg_grant_months": 36,
+        "utility_model": false
+      },
+      "market_attractiveness": {
+        "tier": 3,
+        "vc_ecosystem": "성장 중 (나이로비 iHub)",
+        "tech_sectors": ["M-Pesa 핀테크", "AgriTech", "원격의료", "오프그리드 에너지"],
+        "strategic_position": "동아프리카 허브, M-Pesa 발원지"
+      },
+      "regulatory_burden": "중간 — KEBS(표준)·PPOA(조달)·CDAs(협동조합)",
+      "dev_finance": ["AfDB", "World Bank IDA", "IFC", "USAID", "DFID"],
+      "market_entry_note": "M-Pesa 모바일머니 생태계 연계가 핵심. 동아프리카 커뮤니티(EAC) 관문"
+    },
+    {
+      "code": "ZAF",
+      "iso2": "ZA",
+      "name": "남아프리카공화국",
+      "region": "사하라이남아프리카",
+      "gdp_usd_bn": 405,
+      "gdp_growth_pct": 1.5,
+      "population_mn": 62,
+      "ip_environment": {
+        "ip_score": 40,
+        "patent_system": "선출원주의 (CIPC)",
+        "patent_office": "CIPC",
+        "enforcement": "중간 (영미법 기반)",
+        "avg_grant_months": 48,
+        "utility_model": false
+      },
+      "market_attractiveness": {
+        "tier": 2,
+        "vc_ecosystem": "중간 (케이프타운·요하네스버그)",
+        "tech_sectors": ["핀테크", "AgriTech", "광업 AI", "재생에너지"],
+        "strategic_position": "사하라이남 아프리카 관문, SADC 시장 허브"
+      },
+      "regulatory_burden": "중간 — SAHPRA(의약)·DAFF(농업)·ICASA(통신)",
+      "key_programs": ["SEDA (중소기업개발청)", "IDC (산업개발공사)", "DTI 인센티브"],
+      "dev_finance": ["DBSA (남아공 개발은행)", "AfDB", "IFC"],
+      "market_entry_note": "제조기반·물류 허브. SADC(14개국) 관문 역할"
+    },
+    {
+      "code": "ETH",
+      "iso2": "ET",
+      "name": "에티오피아",
+      "region": "사하라이남아프리카",
+      "gdp_usd_bn": 156,
+      "gdp_growth_pct": 7.0,
+      "population_mn": 127,
+      "ip_environment": {
+        "ip_score": 20,
+        "patent_system": "선출원주의 (EIPO)",
+        "enforcement": "매우 약함",
+        "utility_model": false
+      },
+      "market_attractiveness": {
+        "tier": 3,
+        "tech_sectors": ["AgriTech (커피·테프·화훼)", "봉제·경공업", "원격의료"],
+        "strategic_position": "아프리카 2위 인구, AU 본부 소재"
+      },
+      "dev_finance": ["World Bank IDA", "AfDB", "GCF", "USAID", "JICA"],
+      "ldc_status": true,
+      "market_entry_note": "커피·화훼 수출 AgriTech 수요 높음. IDA 대출 연계 B2G 모델"
+    },
+    {
+      "code": "BRA",
+      "iso2": "BR",
+      "name": "브라질",
+      "region": "중남미",
+      "gdp_usd_bn": 2174,
+      "gdp_growth_pct": 2.5,
+      "population_mn": 215,
+      "ip_environment": {
+        "ip_score": 50,
+        "patent_system": "선출원주의 (INPI)",
+        "patent_office": "INPI",
+        "enforcement": "중간",
+        "avg_grant_months": 72,
+        "annual_filing_count": 30000,
+        "utility_model": true
+      },
+      "market_attractiveness": {
+        "tier": 2,
+        "vc_ecosystem": "발달 (상파울루·캄피나스)",
+        "tech_sectors": ["AgriTech (대두·옥수수·소)", "핀테크", "클린에너지", "바이오"],
+        "gov_rd_pct_gdp": 1.2,
+        "unicorns": 25
+      },
+      "regulatory_burden": "높음 — ANVISA(식의약)·MAPA(농업)·ANATEL(통신)·LGPD(데이터)",
+      "key_programs": ["BNDES (국가개발은행)", "FINEP (혁신기관)", "Embrapa (농업연구공사)"],
+      "market_entry_note": "Agro 4.0 정책 + Embrapa 파트너십 → 열대농업 최대 시장",
+      "dev_finance": ["IADB", "World Bank IBRD", "IFC"],
+      "leapfrog_sectors": ["정밀농업", "바이오에너지(사탕수수)", "핀테크(Pix)"]
+    },
+    {
+      "code": "MEX",
+      "iso2": "MX",
+      "name": "멕시코",
+      "region": "중남미",
+      "gdp_usd_bn": 1322,
+      "gdp_growth_pct": 2.0,
+      "population_mn": 130,
+      "ip_environment": {
+        "ip_score": 48,
+        "patent_system": "선출원주의 (IMPI)",
+        "patent_office": "IMPI",
+        "enforcement": "약함~중간",
+        "avg_grant_months": 48,
+        "utility_model": true
+      },
+      "market_attractiveness": {
+        "tier": 2,
+        "vc_ecosystem": "중간 (멕시코시티)",
+        "tech_sectors": ["제조(니어쇼어링)", "AgriTech", "핀테크", "재생에너지"],
+        "nearshoring_boom": true
+      },
+      "regulatory_burden": "중간 — COFEPRIS(식의약)·SAGARPA(농업)·CFE(에너지)",
+      "key_programs": ["ProMéxico", "CONACYT (과학기술의회)"],
+      "market_entry_note": "미국 니어쇼어링 수요 급증. USMCA 관세혜택 연계",
+      "dev_finance": ["IADB", "World Bank IBRD"]
+    },
+    {
+      "code": "COL",
+      "iso2": "CO",
+      "name": "콜롬비아",
+      "region": "중남미",
+      "gdp_usd_bn": 344,
+      "gdp_growth_pct": 2.5,
+      "population_mn": 52,
+      "ip_environment": {
+        "ip_score": 42,
+        "patent_system": "선출원주의 (SIC)",
+        "enforcement": "약함~중간",
+        "utility_model": true
+      },
+      "market_attractiveness": {
+        "tier": 3,
+        "tech_sectors": ["커피·화훼 AgriTech", "핀테크", "클린에너지"],
+        "strategic_position": "중남미 신흥 스타트업 허브"
+      },
+      "dev_finance": ["IADB", "World Bank", "IFC", "GEF"],
+      "market_entry_note": "커피·화훼 수출 스마트팜 수요 높음"
+    },
+    {
+      "code": "CHL",
+      "iso2": "CL",
+      "name": "칠레",
+      "region": "중남미",
+      "gdp_usd_bn": 312,
+      "gdp_growth_pct": 2.0,
+      "population_mn": 20,
+      "ip_environment": {
+        "ip_score": 55,
+        "patent_system": "선출원주의 (INAPI)",
+        "enforcement": "중간",
+        "utility_model": false
+      },
+      "market_attractiveness": {
+        "tier": 2,
+        "vc_ecosystem": "중간 (산티아고)",
+        "tech_sectors": ["구리광업 AI", "태양광(아타카마)", "수소", "AgriTech(포도·연어)"],
+        "strategic_position": "중남미 최고 비즈니스 환경 (World Bank EDB)"
+      },
+      "key_programs": ["Corfo (생산진흥청)", "Start-Up Chile"],
+      "dev_finance": ["IADB", "World Bank IBRD", "IFC"],
+      "market_entry_note": "중남미 진입 허브 역할. 구리·수소·재생에너지 클린테크 기회"
+    },
+    {
+      "code": "ISR",
+      "iso2": "IL",
+      "name": "이스라엘",
+      "region": "중동·북아프리카",
+      "gdp_usd_bn": 521,
+      "ip_environment": {
+        "ip_score": 72,
+        "patent_system": "선출원주의 (ILPO)",
+        "patent_office": "ILPO",
+        "enforcement": "강함",
+        "avg_grant_months": 24,
+        "annual_filing_count": 9000,
+        "utility_model": false
+      },
+      "market_attractiveness": {
+        "tier": 1,
+        "vc_ecosystem": "매우 발달 (텔아비브 '스타트업 네이션')",
+        "tech_sectors": ["사이버보안", "AgriTech (물방울관개)", "AI", "의료기기"],
+        "gov_rd_pct_gdp": 5.6,
+        "unicorns": 40
+      },
+      "regulatory_burden": "중간 — MOAG(농업)·MOH(보건)·IMPA(표준)",
+      "key_programs": ["Yozma Fund (글로벌 VC 유치)", "IIA (이노베이션 청)", "Haifa University TT"],
+      "market_entry_note": "정밀농업·드립관개 원천기술 보유. 이중사용기술(국방↔민간) 강점"
+    },
+    {
+      "code": "AUS",
+      "iso2": "AU",
+      "name": "호주",
+      "region": "오세아니아",
+      "gdp_usd_bn": 1689,
+      "ip_environment": {
+        "ip_score": 76,
+        "patent_system": "선출원주의 (IP Australia)",
+        "patent_office": "IP Australia",
+        "enforcement": "강함 (영미법)",
+        "avg_grant_months": 30,
+        "utility_model": false
+      },
+      "market_attractiveness": {
+        "tier": 1,
+        "vc_ecosystem": "중간 (시드니·멜버른)",
+        "tech_sectors": ["광업 AI", "AgriTech (목축·밀)", "클린테크", "바이오"],
+        "gov_rd_pct_gdp": 1.9
+      },
+      "regulatory_burden": "중간 — TGA(의약)·APVMA(농약)·ACCC(경쟁)",
+      "key_programs": ["R&D Tax Incentive (43.5% 세액공제)", "CSIRO 연계", "Business Victoria"],
+      "market_entry_note": "인도태평양 파트너십. AUKUS·Quad 프레임 내 딥테크 협력"
     },
     {
       "code": "CAN",
+      "iso2": "CA",
       "name": "캐나다",
       "region": "북미",
       "gdp_usd_bn": 2140,
       "ip_environment": {
-        "ip_score": 76,
-        "patent_system": "영미법 기반, CIPO",
+        "ip_score": 78,
+        "patent_system": "선출원주의 (CIPO)",
+        "patent_office": "CIPO",
         "enforcement": "강함",
-        "avg_grant_months": 30,
-        "annual_filing_count": 36000
+        "avg_grant_months": 24,
+        "utility_model": false
       },
       "market_attractiveness": {
-        "tier": 3,
+        "tier": 1,
         "vc_ecosystem": "발달 (토론토·밴쿠버·몬트리올)",
-        "tech_sectors": ["AI", "클린테크", "광업", "바이오"],
-        "regulatory_burden": "중간"
+        "tech_sectors": ["AI (Vector·Mila·Amii)", "클린테크", "AgriTech", "핀테크"],
+        "gov_rd_pct_gdp": 1.7
       },
-      "key_certifications": ["Health Canada", "ISED", "CSA"],
-      "filing_cost_usd": 7000
+      "regulatory_burden": "중간 — Health Canada·CFIA(식품)·PIPEDA(데이터)",
+      "key_programs": ["SR&ED (세액공제 35%)", "IRAP (산업연구지원)", "BDC 벤처"],
+      "market_entry_note": "캐나다 통해 미국 USMCA 우회 진입 가능"
     }
-  ]
+  ],
+
+  "region_summary": {
+    "KR": {
+      "ip_tier": "강함",
+      "regulatory_tier": "중간",
+      "market_tier": 1,
+      "dev_aid_role": "공여국"
+    },
+    "US": {
+      "ip_tier": "매우 강함",
+      "regulatory_tier": "높음",
+      "market_tier": 1,
+      "dev_aid_role": "공여국"
+    },
+    "EU": {
+      "ip_tier": "강함",
+      "regulatory_tier": "높음",
+      "market_tier": 1,
+      "dev_aid_role": "공여국 (EFSD+)"
+    },
+    "DEV_SEA": {
+      "ip_tier": "약함~중간",
+      "regulatory_tier": "중간",
+      "market_tier": "2~3",
+      "dev_aid_role": "수혜국",
+      "key_countries": ["VN", "ID", "TH", "PH", "MY"]
+    },
+    "DEV_SAS": {
+      "ip_tier": "중간",
+      "regulatory_tier": "높음",
+      "market_tier": "2~3",
+      "key_countries": ["IN", "BD"]
+    },
+    "DEV_MENA": {
+      "ip_tier": "약함~중간",
+      "regulatory_tier": "중간",
+      "market_tier": "2~3",
+      "key_countries": ["EG", "AE", "SA", "MA"]
+    },
+    "DEV_AFR": {
+      "ip_tier": "매우 약함",
+      "regulatory_tier": "중간",
+      "market_tier": 3,
+      "dev_aid_role": "수혜국",
+      "key_countries": ["NG", "KE", "ZA", "ET"]
+    },
+    "DEV_LAC": {
+      "ip_tier": "약함~중간",
+      "regulatory_tier": "중간",
+      "market_tier": "2~3",
+      "key_countries": ["BR", "MX", "CO", "CL"]
+    }
+  }
 }

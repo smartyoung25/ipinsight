@@ -29,6 +29,8 @@ class CodeContext:
     market:     dict = field(default_factory=dict)   # WorldBank+OECD 시장·경제
     clinical:   dict = field(default_factory=dict)   # ClinicalTrials+EUDAMED 임상·규제
     esg:        dict = field(default_factory=dict)   # ClimateTRACE+OWID ESG·탄소
+    # Phase 2 추가 — 4개 지역 통합 (KR·US·EU·DEV)
+    regional:   dict = field(default_factory=dict)   # 지역별 IP·규제·자금·GTM·ESG
     errors:     list = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -540,12 +542,15 @@ class CodeLinkerPipeline:
         # Phase 1 Connectors (즉시연결 DB)
         try:
             from pipeline.connectors import PaperConnector, MarketConnector, ClinicalConnector, ESGConnector
+            from pipeline.connectors.regional_connector import RegionalConnector
         except ImportError:
             from connectors import PaperConnector, MarketConnector, ClinicalConnector, ESGConnector
+            from connectors.regional_connector import RegionalConnector
         self.paper    = PaperConnector()
         self.market   = MarketConnector()
         self.clinical = ClinicalConnector()
         self.esg      = ESGConnector()
+        self.regional = RegionalConnector()
 
     def run(self, tech_id: str, params: dict) -> CodeContext:
         """
@@ -680,6 +685,16 @@ class CodeLinkerPipeline:
             )
         except Exception as e:
             ctx.errors.append(f"esg: {e}")
+
+        # 12. 4개 지역 통합 분석 (KR·US·EU·DEV)
+        try:
+            target = params.get("target_markets", ["KR"])
+            tech_t = params.get("tech_type", "software_saas")
+            regional_ctx = self.regional.analyze(target, tech_t,
+                                                  params.get("efficiency_pct", 10.0))
+            ctx.regional = regional_ctx.to_dict()
+        except Exception as e:
+            ctx.errors.append(f"regional: {e}")
 
         return ctx
 
