@@ -524,3 +524,75 @@ class TestErrorResponseFormat:  # noqa: F811
     def test_422_missing_required_field(self, client, auth_headers):
         r = client.post("/valuation/dcf", json={}, headers=auth_headers)
         assert r.status_code == 422
+
+
+# ══════════════════════════════════════════════════════════════
+# 9. /ip/analyze-chain-extended (G1→G2→G3 파이프라인)
+# ══════════════════════════════════════════════════════════════
+
+class TestAnalyzeChainExtended:
+    PATENT_TEXT = (
+        "청구항 1: 딥러닝 기반 작물 수확량 예측 방법으로서, "
+        "IoT 센서로부터 수집된 온습도 데이터와 기상정보를 결합하여 "
+        "LSTM 신경망으로 7일 후 수확량을 예측하는 단계를 포함하는 방법."
+    )
+
+    def test_returns_three_step_chain(self, client, auth_headers):
+        r = client.post(
+            "/ip/analyze-chain-extended",
+            json={"patent_text": self.PATENT_TEXT, "tech_id": "EXT-001"},
+            headers=auth_headers,
+        )
+        assert r.status_code == 200
+        body = r.json()
+        chain = body["chain"]
+        assert "step2_pcml" in chain
+        assert "step3_scr" in chain
+        assert "step4_g3" in chain
+
+    def test_pipeline_scores_present(self, client, auth_headers):
+        r = client.post(
+            "/ip/analyze-chain-extended",
+            json={"patent_text": self.PATENT_TEXT, "tech_id": "EXT-002"},
+            headers=auth_headers,
+        )
+        body = r.json()
+        scores = body.get("pipeline_scores", {})
+        assert "pcml" in scores
+        assert "scr" in scores
+        assert "g3" in scores
+        assert "composite" in scores
+        assert 0 <= scores["composite"] <= 100
+
+    def test_overall_gate_is_valid(self, client, auth_headers):
+        r = client.post(
+            "/ip/analyze-chain-extended",
+            json={"patent_text": self.PATENT_TEXT, "tech_id": "EXT-003"},
+            headers=auth_headers,
+        )
+        body = r.json()
+        assert body["overall_gate"] in {"G1", "G2", "G3", "G4", "G5", "Hold", "Kill"}
+
+    def test_422_without_input(self, client, auth_headers):
+        r = client.post(
+            "/ip/analyze-chain-extended",
+            json={"tech_id": "EXT-999"},
+            headers=auth_headers,
+        )
+        assert r.status_code == 422
+
+    def test_custom_market_inputs_override_defaults(self, client, auth_headers):
+        r = client.post(
+            "/ip/analyze-chain-extended",
+            json={
+                "patent_text": self.PATENT_TEXT,
+                "tech_id": "EXT-004",
+                "tam_usd": 2_000_000_000,
+                "growth_rate_pct": 25.0,
+                "target_market": "국내 온실 농가",
+            },
+            headers=auth_headers,
+        )
+        body = r.json()
+        assert body["chain"]["step4_g3"]["tam_usd"] == 2_000_000_000
+        assert body["chain"]["step4_g3"]["growth_rate_pct"] == 25.0

@@ -1295,6 +1295,171 @@ def analyze_chain(req: _ChainRequest, _: dict = Depends(require_auth)):
     }
 
 
+class _ChainExtRequest(BaseModel):
+    patent_id: str = ""
+    patent_text: str = ""
+    tech_id: str = ""
+    tech_name: str = ""
+    scope: str = "basic"
+    # G3 보조 입력 — 없으면 SCR 결과에서 자동 추정
+    tam_usd: float = 0.0
+    sam_usd: float = 0.0
+    som_usd: float = 0.0
+    growth_rate_pct: float = 0.0
+    target_market: str = ""
+
+
+@app.post("/ip/analyze-chain-extended", tags=["IP 자동체인"],
+          summary="특허→PCML→SCR→G3(시장성) 연속 실행")
+def analyze_chain_extended(req: _ChainExtRequest, _: dict = Depends(require_auth)):
+    """PCML(G1)→SCR(G2)→MarketScanner(G3) 3단 연속 파이프라인.
+
+    G3 입력값을 직접 주지 않으면 SCR 화이트스페이스·경쟁자 결과를 자동 활용.
+    """
+    from pipeline.connectors.kipris_connector import fetch_from_kipris
+    from pipeline.connectors.google_patents_connector import fetch_from_google_patents
+    from agents.pcml_agent import PCMLAgent
+    from agents.screening_agent import ScreeningAgent
+    from agents.g3_market_scanner import MarketScanner
+
+    tech_id = req.tech_id or req.patent_id or "unknown"
+    tech_name = req.tech_name or tech_id
+
+    # ── Step 1: 특허 원문 ──────────────────────────────────────
+    patent_text = req.patent_text.strip()
+    patent_raw = None
+    if not patent_text and req.patent_id:
+        for fetcher in [fetch_from_kipris, fetch_from_google_patents]:
+            try:
+                patent_raw = fetcher(req.patent_id)
+                if patent_raw:
+                    break
+            except Exception:
+                pass
+        if patent_raw:
+            patent_text = " ".join(filter(None, [
+                patent_raw.get("title", ""),
+                patent_raw.get("abstract", ""),
+                " ".join(patent_raw.get("claims", [])),
+            ]))
+    if not patent_text:
+        if req.patent_id:
+            patent_text = f"Patent: {req.patent_id}"
+        else:
+            raise HTTPException(422, "patent_text 또는 patent_id 필수")
+
+    # ── Step 2: PCML ───────────────────────────────────────────
+    try:
+        pcml_agent = PCMLAgent()
+        pcml_sr = pcml_agent.assess({
+            "tech_id": tech_id,
+            "patent_id": req.patent_id,
+            "patent_text": patent_text,
+            "input_mode": "full_spec" if len(patent_text) > 200 else "claim_only",
+        })
+        pcml_out = pcml_sr.output_doc
+        kpi_inputs = pcml_agent.extract_kpi_inputs(pcml_out)
+    except Exception as e:
+        raise HTTPException(500, f"PCML 실패: {e}")
+
+    # ── Step 3: SCR ────────────────────────────────────────────
+    try:
+        scr_agent = ScreeningAgent()
+        scr_sr = scr_agent.assess({
+            "tech_id": tech_id,
+            "pcml_result": pcml_out,
+            "scope": req.scope,
+        })
+        scr_out = scr_sr.output_doc
+    except Exception as e:
+        raise HTTPException(500, f"SCR 실패: {e}")
+
+    # ── Step 4: G3 시장성 ─ SCR 결과로 자동 보완 ──────────────
+    white_space = scr_out.get("whiteSpace", [])
+    competitors_raw = scr_out.get("competitorLandscape", {}).get("majorPlayers", [])
+    competitor_names = [
+        (c.get("name") or c) if isinstance(c, dict) else str(c)
+        for c in competitors_raw[:10]
+    ]
+
+    # TAM 자동 추정: SCR ipc_classes 키워드 기반 기본값 적용
+    tam = req.tam_usd or 500_000_000    # 기본 5억 달러 (중소 기술 기준)
+    sam = req.sam_usd or tam * 0.15
+    som = req.som_usd or sam * 0.05
+    growth = req.growth_rate_pct or 8.0  # 글로벌 기술이전 시장 평균
+    target_market = req.target_market or "글로벌 B2B 기술 라이선싱"
+
+    try:
+        g3_agent = MarketScanner()
+        g3_sr = g3_agent.assess({
+            "tech_name": tech_name,
+            "target_market": target_market,
+            "tam_usd": tam,
+            "sam_usd": sam,
+            "som_usd": som,
+            "growth_rate_pct": growth,
+            "competitors": competitor_names,
+            "entry_barriers": [ws.get("barrier", ws) if isinstance(ws, dict) else str(ws) for ws in white_space[:5]],
+            "substitute_technologies": [],
+        })
+        g3_out = g3_sr.output_doc
+    except Exception as e:
+        raise HTTPException(500, f"G3 시장성 분석 실패: {e}")
+
+    gate_routing = scr_out.get("scrReport", {}).get("gateRouting", {})
+    overall_gate = gate_routing.get("gate", scr_sr.gate)
+
+    return {
+        "tech_id": tech_id,
+        "patent_id": req.patent_id,
+        "chain": {
+            "step1_patent": {
+                "success": bool(patent_raw),
+                "source": patent_raw.get("source", "") if patent_raw else "direct_input",
+                "title": patent_raw.get("title", "") if patent_raw else "",
+            },
+            "step2_pcml": {
+                "gate": pcml_sr.gate,
+                "score": pcml_sr.score,
+                "qc_grade": pcml_out.get("qc", {}).get("qc_grade", ""),
+                "core_nodes": pcml_out.get("shared_variables", {}).get("self_core_nodes", 0),
+                "release_status": pcml_out.get("governance", {}).get("release_status", ""),
+                "kpi_inputs": kpi_inputs,
+            },
+            "step3_scr": {
+                "gate": scr_sr.gate,
+                "score": scr_sr.score,
+                "novelty": scr_out.get("noveltyAnalysis", {}).get("status", ""),
+                "inventive": scr_out.get("inventiveStep", {}).get("status", ""),
+                "white_space": white_space,
+                "hard_stops": [h for h in scr_out.get("scrReport", {}).get("hardStops", []) if h.get("detected")],
+            },
+            "step4_g3": {
+                "gate": g3_sr.gate,
+                "score": g3_sr.score,
+                "tam_usd": tam,
+                "sam_usd": sam,
+                "som_usd": som,
+                "growth_rate_pct": growth,
+                "competitors_analyzed": len(competitor_names),
+                "attractiveness": g3_out.get("industryAttractiveness", {}).get("rating", ""),
+                "next_actions": g3_sr.next_actions,
+            },
+        },
+        "overall_gate": overall_gate,
+        "pipeline_scores": {
+            "pcml": pcml_sr.score,
+            "scr": scr_sr.score,
+            "g3": g3_sr.score,
+            "composite": round((pcml_sr.score * 0.3 + scr_sr.score * 0.4 + g3_sr.score * 0.3), 1),
+        },
+        "recommended_reports": gate_routing.get("recommendedReports", ["R1_investment"]),
+        "next_steps": g3_sr.next_actions[:5],
+        "warnings": pcml_sr.warnings + scr_sr.warnings,
+        "consistency_check": _check_pcml_scr_consistency(pcml_sr, scr_sr),
+    }
+
+
 @app.post(
     "/analyze/async",
     response_model=JobStatus,
