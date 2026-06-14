@@ -7,7 +7,7 @@ import requests
 import streamlit as st
 
 # ── 설정 ─────────────────────────────────────────────────────────
-API_URL = os.environ.get("IPINSIGHT_API", "http://localhost:8100")
+API_URL = os.environ.get("IPINSIGHT_API", "http://localhost:8001")
 
 STAGE_META = {
     0:  ("G0",  "기술발굴",   "🔭"),
@@ -513,8 +513,13 @@ if st.session_state.page == "home":
 
         # 하단 상태
         st.markdown("<hr style='border-color:#2a2a2a;margin:20px 0 8px'>", unsafe_allow_html=True)
-        api_dot = "🟢" if api_ok else "🔴"
-        st.caption(f"{api_dot} API {'연결됨' if api_ok else '오프라인'}")
+        status_bg = "#14532d" if api_ok else "#7f1d1d"
+        status_txt = "🟢 API 연결" if api_ok else "🔴 API 오프라인"
+        st.markdown(
+            f"<div style='background:{status_bg};border-radius:6px;padding:6px 10px;"
+            f"font-size:11px;color:#e2e8f0;text-align:center;margin-top:4px'>{status_txt}</div>",
+            unsafe_allow_html=True,
+        )
         if st.session_state.token:
             if st.button("로그아웃", use_container_width=True, key="logout_home"):
                 st.session_state.token = ""; st.rerun()
@@ -527,21 +532,27 @@ if st.session_state.page == "home":
         step = st.session_state.home_step
 
         # ── 스텝 진행 표시 ──────────────────────────────────────────
-        STEPS = ["① 자료 입력", "② 단계 추천", "③ 추가 입력 · 실행"]
-        prog_html = "<div style='display:flex;gap:0;margin-bottom:28px;margin-top:16px'>"
-        for i, s_label in enumerate(STEPS, 1):
-            active  = (i == step)
-            done    = (i < step)
-            bg      = "#2563eb" if active else ("#16a34a" if done else "#2a2a2a")
-            txt_clr = "#fff" if (active or done) else "#555"
+        STEPS = [("① 자료 입력", "특허·논문·사업계획서"), ("② 단계 추천", "최적 경로 선택"), ("③ 실행·리포팅", "분석 후 보고서")]
+        prog_html = (
+            "<div style='display:flex;align-items:stretch;gap:0;margin-bottom:32px;margin-top:20px;"
+            "border-radius:12px;overflow:hidden;border:1px solid #333'>"
+        )
+        for i, (s_label, s_sub) in enumerate(STEPS, 1):
+            active = (i == step)
+            done   = (i < step)
+            bg     = "linear-gradient(135deg,#1d4ed8,#2563eb)" if active else ("linear-gradient(135deg,#14532d,#16a34a)" if done else "#1a1a1a")
+            opacity = "1" if (active or done) else "0.5"
+            icon   = "✓" if done else str(i)
             prog_html += (
-                f"<div style='flex:1;padding:8px 6px;text-align:center;"
-                f"background:{bg};color:{txt_clr};font-size:12px;font-weight:600;"
-                f"border-radius:{('8px 0 0 8px' if i==1 else ('0 8px 8px 0' if i==3 else '0'))}'>"
-                f"{'✓ ' if done else ''}{s_label}</div>"
+                f"<div style='flex:1;padding:14px 16px;text-align:center;"
+                f"background:{bg};opacity:{opacity};position:relative'>"
+                f"<div style='font-size:18px;font-weight:800;color:#fff'>{icon}</div>"
+                f"<div style='font-size:13px;font-weight:700;color:#fff;margin-top:2px'>{s_label}</div>"
+                f"<div style='font-size:10px;color:rgba(255,255,255,.65);margin-top:2px'>{s_sub}</div>"
+                f"</div>"
             )
             if i < 3:
-                prog_html += "<div style='width:2px;background:#111'></div>"
+                prog_html += "<div style='width:1px;background:#333'></div>"
         prog_html += "</div>"
         st.markdown(prog_html, unsafe_allow_html=True)
 
@@ -1012,8 +1023,8 @@ elif st.session_state.page == "ip_hub":
     st.title("📡 IP 분석 허브")
     render_stage_bar(current=1)
 
-    tab_chain, tab_lifecycle, tab_fto = st.tabs(
-        ["⚡ PCML+SCR 분석 체인", "🔄 IP 전주기 분석", "🔍 FTO · 경쟁사"]
+    tab_chain, tab_extended, tab_lifecycle, tab_fto = st.tabs(
+        ["⚡ G1+G2 체인", "🚀 G1→G2→G3 통합", "🔄 IP 전주기", "🔍 FTO · 경쟁사"]
     )
 
     with tab_chain:
@@ -1079,6 +1090,86 @@ elif st.session_state.page == "ip_hub":
 
                 with st.expander("전체 분석 결과 JSON"):
                     st.json(result)
+
+    with tab_extended:
+        st.subheader("G1 PCML → G2 SCR → G3 시장성 통합 분석")
+        st.caption("특허 텍스트 하나로 IP 구조화·신규성·시장성을 한 번에 평가합니다.")
+
+        ext_text = st.text_area(
+            "특허 텍스트 또는 기술 설명",
+            height=140,
+            placeholder="청구항 1: 딥러닝 기반 작물 수확량 예측 방법으로서...",
+            key="ext_patent_text",
+        )
+        ec1, ec2, ec3 = st.columns(3)
+        ext_tam    = ec1.number_input("TAM (USD)", value=500_000_000, step=100_000_000, format="%d", key="ext_tam")
+        ext_growth = ec2.number_input("성장률 (%)", value=8.0, step=1.0, key="ext_growth")
+        ext_mkt    = ec3.text_input("목표 시장", value="글로벌 B2B 기술 라이선싱", key="ext_mkt")
+
+        if st.button("🚀 G1→G2→G3 통합 분석 실행", type="primary",
+                     disabled=not ext_text.strip(), key="ext_run"):
+            with st.spinner("G1 PCML → G2 SCR → G3 시장성 분석 중… (약 60초)"):
+                ext_result = api_post("/ip/analyze-chain-extended", {
+                    "patent_text":    ext_text,
+                    "tech_id":        st.session_state.tech_id or "EXT",
+                    "tech_name":      st.session_state.tech_name or "분석 기술",
+                    "tam_usd":        ext_tam,
+                    "growth_rate_pct": ext_growth,
+                    "target_market":  ext_mkt,
+                })
+            if ext_result:
+                chain  = ext_result.get("chain", {})
+                scores = ext_result.get("pipeline_scores", {})
+                pcml_s = chain.get("step2_pcml", {})
+                scr_s  = chain.get("step3_scr", {})
+                g3_s   = chain.get("step4_g3", {})
+
+                # 점수 게이지 4개
+                mc1, mc2, mc3, mc4 = st.columns(4)
+                mc1.metric("📋 G1 PCML", f"{scores.get('pcml',0):.0f}점", pcml_s.get('gate',''))
+                mc2.metric("🧪 G2 SCR",  f"{scores.get('scr',0):.0f}점",  scr_s.get('gate',''))
+                mc3.metric("🌐 G3 시장", f"{scores.get('g3',0):.0f}점",   g3_s.get('gate',''))
+                mc4.metric("⭐ 종합",    f"{scores.get('composite',0):.0f}점", ext_result.get('overall_gate',''))
+
+                # 화이트스페이스 카드
+                white_space = scr_s.get("white_space", [])
+                if white_space:
+                    st.markdown("**🔭 화이트스페이스 (진입 가능 공백 영역)**")
+                    ws_cols = st.columns(min(len(white_space), 3))
+                    for wi, ws in enumerate(white_space[:3]):
+                        ws_label = ws.get("area", ws) if isinstance(ws, dict) else str(ws)
+                        ws_cols[wi % 3].markdown(
+                            f"<div style='background:#1e2a1e;border:1px solid #16a34a;"
+                            f"border-radius:8px;padding:10px 12px;font-size:12px'>"
+                            f"<b style='color:#4ade80'>🌱 {ws_label}</b></div>",
+                            unsafe_allow_html=True,
+                        )
+
+                # G3 시장 요약
+                st.markdown("**📊 G3 시장성 요약**")
+                g3c1, g3c2, g3c3 = st.columns(3)
+                g3c1.metric("TAM", f"${ext_tam/1e6:.0f}M")
+                g3c2.metric("성장률", f"{ext_growth:.1f}%/yr")
+                g3c3.metric("경쟁사 분석", f"{g3_s.get('competitors_analyzed',0)}개사")
+
+                # 다음 단계
+                next_steps = ext_result.get("next_steps", [])
+                if next_steps:
+                    st.markdown("**🗺 권장 다음 단계**")
+                    for ns in next_steps[:5]:
+                        st.markdown(f"- {ns}")
+
+                # stage_gates 업데이트
+                for sn, sk, score_key in [(1,'step2_pcml','pcml'),(2,'step3_scr','scr'),(3,'step4_g3','g3')]:
+                    s = chain.get(sk, {})
+                    if s.get('gate'):
+                        st.session_state.stage_gates[sn] = {"gate": s['gate'], "score": scores.get(score_key, 0)}
+                _save_gate(1, {"gate": ext_result.get('overall_gate',''), "score": scores.get('composite',0), "next_actions": next_steps})
+
+                with st.expander("전체 JSON"):
+                    st.json(ext_result)
+            else:
+                st.error("분석 실패 — API 서버를 확인하세요.")
 
     with tab_lifecycle:
         st.subheader("IP 4단계 전주기 분석")
