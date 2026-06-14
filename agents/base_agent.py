@@ -43,27 +43,70 @@ class BaseAgent:
         self._init_llm()
 
     def _init_llm(self):
-        api_key = os.getenv("ANTHROPIC_API_KEY", "")
-        if api_key:
+        """LLM 클라이언트 초기화.
+
+        우선순위: Groq(키 있을 때) > Anthropic(키+크레딧) > 규칙기반
+        Groq가 설정되면 무료 즉시 사용 가능하므로 Anthropic보다 우선.
+        Anthropic만 있을 때는 크레딧 상태를 런타임에 확인.
+        """
+        # 1순위: Groq (키 있으면 우선 — 무료·안정적)
+        groq_key = os.getenv("GROQ_API_KEY", "")
+        if groq_key:
             try:
-                import anthropic
-                self._llm_client = anthropic.Anthropic(api_key=api_key)
+                from openai import OpenAI
+                self._llm_client = OpenAI(
+                    api_key=groq_key,
+                    base_url="https://api.groq.com/openai/v1",
+                )
+                self._llm_backend = "groq"
+                return
             except ImportError:
                 pass
 
+        # 2순위: Anthropic (Groq 없을 때)
+        ant_key = os.getenv("ANTHROPIC_API_KEY", "")
+        if ant_key:
+            try:
+                import anthropic
+                self._llm_client = anthropic.Anthropic(api_key=ant_key)
+                self._llm_backend = "anthropic"
+                return
+            except ImportError:
+                pass
+
+        self._llm_client = None
+        self._llm_backend = "rule"
+
     def _llm(self, prompt: str, system: str = "") -> str:
-        """LLM 호출 — API 키 없으면 규칙기반 폴백"""
+        """LLM 호출 — Anthropic → Groq → 규칙기반 폴백 순서."""
         if self._llm_client is None:
             return self._rule_fallback(prompt)
+
+        backend = getattr(self, "_llm_backend", "anthropic")
+        sys_msg = system or f"당신은 글로벌 기술사업화 전문가입니다. {self.stage_name} 단계를 담당합니다."
+
         try:
-            msg = self._llm_client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=2048,
-                system=system or f"당신은 글로벌 기술사업화 전문가입니다. {self.stage_name} 단계를 담당합니다.",
-                messages=[{"role": "user", "content": prompt}],
-            )
-            return msg.content[0].text
-        except Exception:
+            if backend == "anthropic":
+                msg = self._llm_client.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=2048,
+                    system=sys_msg,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                return msg.content[0].text
+            elif backend == "groq":
+                resp = self._llm_client.chat.completions.create(
+                    model="llama-3.1-8b-instant",
+                    max_tokens=2048,
+                    messages=[
+                        {"role": "system", "content": sys_msg},
+                        {"role": "user", "content": prompt},
+                    ],
+                )
+                return resp.choices[0].message.content
+        except Exception as _e:
+            import logging as _log
+            _log.getLogger("base_agent").warning("LLM(%s) 실패 → 규칙폴백: %s", backend, _e)
             return self._rule_fallback(prompt)
 
     def _rag(self, query: str, top_k: int = 5, source_filter: str = "") -> str:

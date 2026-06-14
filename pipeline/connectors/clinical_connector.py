@@ -8,8 +8,17 @@ from pathlib import Path
 CACHE_DIR = Path(__file__).parent.parent.parent / ".rag_cache"
 CACHE_DIR.mkdir(exist_ok=True)
 
+import os as _os
+
 _CT  = "https://clinicaltrials.gov/api/v2"
 _EUD = "https://ec.europa.eu/tools/eudamed/api"
+_FDA = "https://api.fda.gov"
+
+
+def _fda_key_param() -> str:
+    """FDA API 키를 쿼리 파라미터로 반환 (미설정 시 빈 문자열)"""
+    key = _os.environ.get("FDA_API_KEY", "")
+    return f"&api_key={key}" if key else ""
 
 
 def _get(url: str, timeout: int = 10) -> dict:
@@ -54,10 +63,15 @@ class ClinicalConnector:
             url = f"{_CT}/studies?{urllib.parse.urlencode(params)}"
             data = _cached_get(url)
             studies = data.get("studies", [])
+            # v2 API: totalCount 키 없음 — nextPageToken 유무로 더 있음 판단
+            # 반환된 studies 수로 근사치 사용
+            total = len(studies)
+            if data.get("nextPageToken"):
+                total = len(studies) + 1   # "더 있음" 표시 (정확한 수는 API 미제공)
             return {
                 "source":        "ClinicalTrials.gov v2",
                 "query":         query,
-                "total":         data.get("totalCount", 0),
+                "total":         total,
                 "trials": [
                     {
                         "nct_id":    s.get("protocolSection", {}).get("identificationModule", {}).get("nctId"),
@@ -80,17 +94,21 @@ class ClinicalConnector:
         """기술명 → 유사 임상 건수·평균 단계·평균 규모 벤치마킹"""
         data = self.search_trials(tech_name, limit=10)
         trials = data.get("trials", [])
+        # search_trials는 "total" 키 반환, to_dict 전달 시 total_in_db 매핑 수정
+        total_in_db = data.get("total", data.get("totalCount", 0))
         phases = [t["phase"] for t in trials if t.get("phase")]
         sponsors = [t["sponsor"] for t in trials if t.get("sponsor")]
-        enrollments = [t["enrollment"] for t in trials if t.get("enrollment")]
+        enrollments = [t["enrollment"] for t in trials if t.get("enrollment") and isinstance(t["enrollment"], (int, float))]
         return {
+            "source":             "ClinicalTrials.gov v2",
             "tech_name":          tech_name,
             "similar_trials":     len(trials),
-            "total_in_db":        data.get("total", 0),
+            "total_in_db":        total_in_db,
             "phase_distribution": phases,
             "avg_enrollment":     round(sum(enrollments) / len(enrollments)) if enrollments else None,
             "top_sponsors":       list(set(sponsors))[:5],
-            "regulatory_signal":  self._regulatory_signal(len(trials), data.get("total", 0)),
+            "regulatory_signal":  self._regulatory_signal(len(trials), total_in_db),
+            "trials":             trials[:5],
         }
 
     def eudamed_search(self, keyword: str, limit: int = 5) -> dict:
@@ -115,6 +133,64 @@ class ClinicalConnector:
         except Exception as e:
             return {"source": "EUDAMED", "keyword": keyword, "error": str(e)[:80],
                     "portal": "https://ec.europa.eu/tools/eudamed"}
+
+    def fda_device_clearance(self, device_name: str, limit: int = 5) -> dict:
+        """FDA 510(k) 의료기기 승인 현황 — openFDA (무키 1,000/일, FDA_API_KEY 설정 시 120,000/일)"""
+        try:
+            encoded = urllib.parse.quote(device_name)
+            url = (f"{_FDA}/device/510k.json"
+                   f"?search=device_name:{encoded}&limit={limit}"
+                   f"{_fda_key_param()}")
+            data = _cached_get(url, ttl_hours=72)
+            results = data.get("results", [])
+            total_count = data.get("meta", {}).get("results", {}).get("total", len(results))
+            return {
+                "source":        "FDA openFDA 510(k)",
+                "query":         device_name,
+                "total_cleared": total_count,
+                "api_limit":     "120,000/일 (키 설정)" if _fda_key_param() else "1,000/일 (무키)",
+                "clearances": [
+                    {
+                        "k_number":    r.get("k_number", ""),
+                        "device_name": r.get("device_name", ""),
+                        "applicant":   r.get("applicant", ""),
+                        "decision":    r.get("decision_description", ""),
+                        "date":        r.get("decision_date", ""),
+                        "product_code": r.get("product_code", ""),
+                    }
+                    for r in results[:limit]
+                ],
+            }
+        except Exception as e:
+            return {"source": "FDA 510(k)", "query": device_name, "error": str(e)[:80],
+                    "note": "FDA_API_KEY 설정 시 한도 120배 확대 (open.fda.gov/apis/authentication/)"}
+
+    def fda_adverse_events(self, device_name: str, limit: int = 5) -> dict:
+        """FDA MAUDE 이상사례 DB — 기기 리스크 프로파일링"""
+        try:
+            encoded = urllib.parse.quote(device_name)
+            url = (f"{_FDA}/device/event.json"
+                   f"?search=device.brand_name:{encoded}&limit={limit}"
+                   f"{_fda_key_param()}")
+            data = _cached_get(url, ttl_hours=72)
+            results = data.get("results", [])
+            total_count = data.get("meta", {}).get("results", {}).get("total", 0)
+            return {
+                "source":       "FDA MAUDE 이상사례 DB",
+                "query":        device_name,
+                "total_events": total_count,
+                "risk_signal":  "위험 모니터링 필요" if total_count > 100 else "이상사례 낮음",
+                "events": [
+                    {
+                        "event_type": r.get("event_type", ""),
+                        "date":       r.get("date_received", ""),
+                        "outcome":    r.get("mdr_text", [{}])[0].get("text", "")[:80] if r.get("mdr_text") else "",
+                    }
+                    for r in results[:limit]
+                ],
+            }
+        except Exception as e:
+            return {"source": "FDA MAUDE", "query": device_name, "error": str(e)[:80]}
 
     def _regulatory_signal(self, similar: int, total: int) -> str:
         if total > 500:

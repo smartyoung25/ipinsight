@@ -10,3 +10,14 @@ pandas==2.2.2
 openpyxl==3.1.5
 jinja2==3.1.4
 python-multipart==0.0.9
+# Phase 1 — 인증
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+# Phase 3 — 운영
+structlog==24.1.0
+# Phase 4 — 프론트엔드
+streamlit>=1.35.0
+plotly>=5.22.0
+# LLM 백엔드 (Groq 무료 대체)
+openai>=1.40.0

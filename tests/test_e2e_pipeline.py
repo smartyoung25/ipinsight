@@ -116,7 +116,7 @@ STAGE_INPUTS = {
         "poc_requests": 10,
         "survey_responses": 250,
     },
-    5: {  # G5 — 만점 조건: value_proposition≥30자·revenue_model 리스트·customer_segments·channels·gtm 양방향
+    5: {  # G5 — 만점 조건: VP·수익모델·고객세그먼트·채널·GTM + Unit Economics + 경쟁 매핑
         "tech_name": "스마트팜 수확량 예측 AI",
         "value_proposition": (
             "수확 7일 전 정확도 MAPE 17.8% 예측으로 유통 사전 계약 달성 — 폐기 손실 30% 절감"
@@ -128,6 +128,23 @@ STAGE_INPUTS = {
         "gtm_timeline_months": 36,
         "cost_structure": {"서버인프라": 120_000, "R&D": 200_000, "영업": 80_000},
         "key_partners": ["농협중앙회", "KAASA", "AWS", "Bosch"],
+        # Unit Economics (LTV:CAC ≥ 5x → Excellent 15점)
+        "cac_usd": 2_000,
+        "ltv_usd": 14_000,
+        "arpu_usd": 500,
+        "churn_rate_pct": 3.0,
+        "gross_margin_pct": 75,
+        "ndr_pct": 110,
+        # 경쟁 매핑 (경쟁자 3개 → 9점)
+        "competitors": [
+            {"name": "Priva", "strength": "글로벌 브랜드", "weakness": "고가·비유연", "market_share_pct": 30},
+            {"name": "Ridder", "strength": "센서 정확도", "weakness": "AI 미흡", "market_share_pct": 20},
+            {"name": "LetsGrow.com", "strength": "데이터 시각화", "weakness": "KR 미진출", "market_share_pct": 10},
+        ],
+        "competitive_position": "niche",
+        "tam_usd": 5_000_000_000,
+        "sam_usd": 500_000_000,
+        "som_usd": 10_000_000,
     },
     6: {  # G6 — 만점 조건: weighted_val≥10M·revenue_forecast·discount_rate·royalty_rate·risk_adjustment 모두 존재
         "tech_name": "스마트팜 수확량 예측 AI",

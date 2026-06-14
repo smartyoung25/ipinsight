@@ -18,7 +18,7 @@ CACHE_DIR.mkdir(exist_ok=True)
 def _get(url: str, timeout: int = 8) -> dict:
     req = urllib.request.Request(
         url,
-        headers={"Accept": "application/json", "User-Agent": "IPInsight/1.0 (research)"},
+        headers={"Accept": "application/json", "User-Agent": "IPInsight/1.0 (mailto:kyoyoung@gmail.com)"},
     )
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return json.loads(r.read().decode())

@@ -7,6 +7,7 @@ import json
 import urllib.request
 import urllib.parse
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -29,12 +30,16 @@ class CodeContext:
     market:     dict = field(default_factory=dict)   # WorldBank+OECD 시장·경제
     clinical:   dict = field(default_factory=dict)   # ClinicalTrials+EUDAMED 임상·규제
     esg:        dict = field(default_factory=dict)   # ClimateTRACE+OWID ESG·탄소
-    # Phase 2 추가 — 4개 지역 통합 (KR·US·EU·DEV)
-    regional:   dict = field(default_factory=dict)   # 지역별 IP·규제·자금·GTM·ESG
+    trade:      dict = field(default_factory=dict)   # UN Comtrade 무역 흐름 (수출입·HS코드)
+    # Phase 2 추가 — 8개 지역 통합 (KR·US·EU·JP·CN·IN·RU·DEV)
+    regional:       dict = field(default_factory=dict)   # 지역별 IP·규제·자금·GTM·ESG
+    route_decision: str  = ""                            # QueryRouter 라우팅 결과 (디버그)
     errors:     list = field(default_factory=list)
 
-    def to_dict(self) -> dict:
-        return {k: v for k, v in self.__dict__.items() if k != "errors"}
+    def to_dict(self, *, debug: bool = False) -> dict:
+        """결과 딕셔너리 변환. debug=True 시 route_decision 포함."""
+        _skip = {"errors"} if debug else {"errors", "route_decision"}
+        return {k: v for k, v in self.__dict__.items() if k not in _skip}
 
 
 # ─────────────────────────────────────────────────────────
@@ -51,70 +56,208 @@ def _get(url: str, timeout: int = 8) -> dict:
 # ─────────────────────────────────────────────────────────
 class PatentConnector:
     """
-    API: USPTO PatentsView (무료, 키 불필요)
-         https://search.patentsview.org/api/v1/patent/
-    API: EPO Open Patent Services (무료, 키 선택)
-         https://ops.epo.org/3.2/rest-services/
-    코드 체계: IPC(국제특허분류) — A~H 8섹션 / CPC(협력특허분류) — IPC+Y확장
+    특허 검색 — 3단계 폴백:
+      1. EPO OPS (developers.epo.org 무료 등록, EPO_CLIENT_ID + EPO_CLIENT_SECRET 설정)
+      2. Google Patents JSON (무료·키 불필요, 실측 200 OK) — 1회 재시도
+      3. 정적 CPC 분류 폴백
+    코드 체계: IPC(A~H 8섹션) / CPC(IPC+Y확장)
     """
 
-    PATENTSVIEW = "https://search.patentsview.org/api/v1/patent/"
+    _GOOGLE_PATENT   = "https://patents.google.com/xhr/query"
+    _CROSSREF        = "https://api.crossref.org/works"
+    _EPO_TOKEN_URL   = "https://ops.epo.org/3.2/auth/accesstoken"
+    _EPO_SEARCH_URL  = "https://ops.epo.org/3.2/rest-services/published-data/search"
+    _epo_bearer: str = ""          # 런타임 캐시 (OAuth2 Bearer)
+    _epo_token_exp: float = 0.0    # 만료 epoch (초)
 
     def search_by_cpc(self, cpc_code: str, limit: int = 5) -> dict:
-        """CPC 코드로 특허 검색 — Y02E (청정에너지), A01G (농업) 등"""
-        try:
-            params = urllib.parse.urlencode({
-                "q": json.dumps({"_prefix": {"patent_cpc_at_issue.cpc_section_id": cpc_code[0]}}),
-                "f": json.dumps(["patent_id", "patent_title", "patent_date", "patent_abstract",
-                                  "patent_cpc_at_issue", "assignees"]),
-                "s": json.dumps([{"patent_date": "desc"}]),
-                "o": json.dumps({"per_page": limit}),
-            })
-            data = _get(f"{self.PATENTSVIEW}?{params}")
-            patents = data.get("patents", [])
-            return {
-                "source": "USPTO PatentsView",
-                "cpc_query": cpc_code,
-                "total_found": data.get("total_hits", 0),
-                "patents": [
-                    {
-                        "id":       p.get("patent_id"),
-                        "title":    p.get("patent_title"),
-                        "date":     p.get("patent_date"),
-                        "assignee": (p.get("assignees") or [{}])[0].get("assignee_organization", ""),
-                        "abstract": (p.get("patent_abstract") or "")[:200],
-                    }
-                    for p in patents[:limit]
-                ],
-            }
-        except Exception as e:
-            return {"source": "USPTO PatentsView", "cpc_query": cpc_code, "error": str(e),
-                    "fallback": _cpc_static(cpc_code)}
+        """CPC 코드로 특허 검색 — EPO OPS → Google Patents JSON → 정적 폴백"""
+        # EPO OPS 우선 (환경변수 EPO_CLIENT_ID + EPO_CLIENT_SECRET 설정 시)
+        import os
+        if os.environ.get("EPO_CLIENT_ID") and os.environ.get("EPO_CLIENT_SECRET"):
+            token = self._get_epo_token()
+            if token:
+                result = self._epo_search(cpc_code, limit, token)
+                if "error" not in result:
+                    return result
+
+        # Google Patents JSON (키 불필요, 200 OK 실측) — 503 시 1회 재시도
+        last_err = None
+        for attempt in range(2):
+            try:
+                if attempt > 0:
+                    time.sleep(2)
+                query = urllib.parse.quote(f"CPC={cpc_code}")
+                url = (f"{self._GOOGLE_PATENT}?url=q%3D{query}"
+                       f"%26before%3Dpriority%3A20260101"
+                       f"%26after%3Dpriority%3A20230101%26num%3D{limit}")
+                req = urllib.request.Request(url, headers={
+                    "User-Agent": "Mozilla/5.0 (compatible; IPInsight/1.0)",
+                    "Accept": "application/json",
+                })
+                with urllib.request.urlopen(req, timeout=12) as r:
+                    data = json.loads(r.read())
+                patents = []
+                for cluster in data.get("results", {}).get("cluster", []):
+                    for item in cluster.get("result", []):
+                        p = item.get("patent", {})
+                        patents.append({
+                            "id":       p.get("publication_number", ""),
+                            "title":    p.get("title", ""),
+                            "date":     p.get("filing_date", p.get("grant_date", "")),
+                            "assignee": p.get("assignee", ""),
+                            "abstract": p.get("abstract", "")[:200],
+                        })
+                return {
+                    "source":      "Google Patents",
+                    "cpc_query":   cpc_code,
+                    "total_found": len(patents),
+                    "patents":     patents[:limit],
+                }
+            except Exception as e:
+                last_err = e
+        return {
+            "source":    "Google Patents → 정적 폴백 (503 일시오류)",
+            "cpc_query": cpc_code,
+            "error":     str(last_err)[:80],
+            "fallback":  _cpc_static(cpc_code),
+            "note":      "EPO OPS 무료 등록(developers.epo.org) 시 안정적 대체 가능",
+        }
 
     def fto_landscape(self, ipc_codes: list[str]) -> dict:
-        """IPC 코드 목록 → FTO 지형 분석 (패밀리 수·주요 출원인)"""
+        """IPC 코드 목록 → FTO 지형 (Google Patents 출원인 집계)"""
         results = {}
         for ipc in ipc_codes[:3]:
-            section = ipc[0] if ipc else "A"
             try:
-                params = urllib.parse.urlencode({
-                    "q": json.dumps({"_prefix": {"patent_cpc_at_issue.cpc_section_id": section}}),
-                    "f": json.dumps(["assignees"]),
-                    "o": json.dumps({"per_page": 20}),
+                cpc_q = ipc.replace(" ", "+")
+                url = (f"{self._GOOGLE_PATENT}?url=q%3DCPC%3D{urllib.parse.quote(ipc)}"
+                       f"%26before%3Dpriority%3A20260101%26after%3Dpriority%3A20200101%26num%3D20")
+                req = urllib.request.Request(url, headers={
+                    "User-Agent": "Mozilla/5.0 (compatible; IPInsight/1.0)",
+                    "Accept": "application/json",
                 })
-                data = _get(f"{self.PATENTSVIEW}?{params}")
+                with urllib.request.urlopen(req, timeout=10) as r:
+                    data = json.loads(r.read())
                 assignees: dict[str, int] = {}
-                for p in data.get("patents", []):
-                    for a in (p.get("assignees") or []):
-                        org = a.get("assignee_organization", "Unknown")
+                total = 0
+                for cluster in data.get("results", {}).get("cluster", []):
+                    for item in cluster.get("result", []):
+                        p = item.get("patent", {})
+                        org = p.get("assignee", "Unknown") or "Unknown"
                         assignees[org] = assignees.get(org, 0) + 1
+                        total += 1
                 results[ipc] = {
-                    "total_patents": data.get("total_hits", 0),
+                    "total_patents": total,
                     "top_assignees": sorted(assignees.items(), key=lambda x: -x[1])[:5],
                 }
             except Exception as e:
-                results[ipc] = {"error": str(e)}
-        return {"source": "USPTO PatentsView", "fto_landscape": results}
+                results[ipc] = {"error": str(e)[:60], "fallback": _cpc_static(ipc)}
+        return {"source": "Google Patents", "fto_landscape": results}
+
+    def _get_epo_token(self) -> str:
+        """EPO OPS OAuth2 Bearer 토큰 획득 (20분 캐시)"""
+        import os, base64
+        if self._epo_bearer and time.time() < self._epo_token_exp - 60:
+            return self._epo_bearer
+        client_id = os.environ.get("EPO_CLIENT_ID", "")
+        client_secret = os.environ.get("EPO_CLIENT_SECRET", "")
+        if not client_id or not client_secret:
+            return ""
+        try:
+            credentials = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+            payload = b"grant_type=client_credentials"
+            req = urllib.request.Request(
+                self._EPO_TOKEN_URL,
+                data=payload,
+                headers={
+                    "Authorization": f"Basic {credentials}",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as r:
+                data = json.loads(r.read())
+            token = data.get("access_token", "")
+            expires_in = int(data.get("expires_in", 1200))
+            PatentConnector._epo_bearer = token
+            PatentConnector._epo_token_exp = time.time() + expires_in
+            return token
+        except Exception:
+            return ""
+
+    def _epo_search(self, cpc_code: str, limit: int, token: str) -> dict:
+        """EPO OPS — OAuth2 Bearer 토큰으로 CPC 검색"""
+        try:
+            url = (f"{self._EPO_SEARCH_URL}"
+                   f"?q=cpc+any+%22{urllib.parse.quote(cpc_code)}%22&Range=1-{limit}")
+            req = urllib.request.Request(url, headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json",
+                "User-Agent": "IPInsight/1.0",
+            })
+            with urllib.request.urlopen(req, timeout=12) as r:
+                raw = json.loads(r.read())
+            # EPO OPS 응답 파싱 (JSON 포맷 선택 시)
+            patents = []
+            ops_response = raw.get("ops:world-patent-data", {})
+            results = ops_response.get("ops:biblio-search", {}).get("ops:search-result", {})
+            for entry in results.get("ops:publication-reference", []):
+                doc = entry.get("document-id", {})
+                # EPO OPS JSON: 값이 {"$": "DE"} 형태
+                def _v(field): return doc.get(field, {}).get("$", "") if isinstance(doc.get(field), dict) else doc.get(field, "")
+                country = _v("country")
+                number  = _v("doc-number")
+                kind    = _v("kind")
+                patents.append({
+                    "id":     f"{country}{number}.{kind}",
+                    "source": "EPO OPS",
+                    "cpc":    cpc_code,
+                    "family_id": entry.get("@family-id", ""),
+                })
+            return {
+                "source":      "EPO OPS",
+                "cpc_query":   cpc_code,
+                "total_found": len(patents),
+                "patents":     patents[:limit] or [{"note": "EPO OPS 연결 성공 (결과 0건 또는 XML 응답)"}],
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
+    def get_patent_detail(self, patent_id: str) -> dict:
+        """EPO OPS 서지정보 조회 (출원인·발명자 등 특허 상세)
+        patent_id 예: 'EP4755175.A1', 'DE102024136833.A1'
+        """
+        import os
+        if not (os.environ.get("EPO_CLIENT_ID") and os.environ.get("EPO_CLIENT_SECRET")):
+            return {"patent_id": patent_id, "error": "EPO OPS 인증 미설정 (.env 확인)"}
+        token = self._get_epo_token()
+        if not token:
+            return {"patent_id": patent_id, "error": "EPO OPS 토큰 획득 실패"}
+        try:
+            safe_id = urllib.parse.quote(patent_id.replace(".", ""), safe="")
+            url = (f"https://ops.epo.org/3.2/rest-services/published-data"
+                   f"/publication/epodoc/{safe_id}/biblio")
+            req = urllib.request.Request(url, headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json",
+                "User-Agent": "IPInsight/1.0",
+            })
+            with urllib.request.urlopen(req, timeout=12) as r:
+                raw = json.loads(r.read())
+            bib = (raw.get("ops:world-patent-data", {})
+                   .get("ops:biblio-search", raw)
+                   .get("ops:publication-reference", {}))
+            return {
+                "source":        "EPO OPS",
+                "patent_id":     patent_id,
+                "bibliographic": bib,
+            }
+        except Exception as e:
+            return {
+                "patent_id": patent_id,
+                "error":     str(e)[:120],
+                "note":      "EPO OPS 서지정보 조회 실패 — 특허 ID 형식 확인",
+            }
 
 
 def _cpc_static(code: str) -> dict:
@@ -268,6 +411,27 @@ class IndustryConnector:
 
     CENSUS_API = "https://api.census.gov/data/2022/naics"
 
+    # 한국어 → 영어 기술키워드 간이 번역 (Census NAICS API 영문 매칭용)
+    _KO_EN_MAP = {
+        "스마트팜": "agriculture smart", "농업": "agriculture", "축산": "livestock",
+        "의료기기": "medical devices", "의료": "health care", "바이오": "biotechnology",
+        "소프트웨어": "software", "인공지능": "computer systems", "AI": "computer systems",
+        "에너지": "electric power", "태양광": "electric power", "배터리": "electrical equipment",
+        "반도체": "semiconductor electronic", "통신": "telecommunications",
+        "자동차": "motor vehicle", "로봇": "manufacturing machinery",
+        "식품": "food manufacturing", "화학": "chemical manufacturing",
+        "건설": "construction", "물류": "transportation logistics",
+        "핀테크": "financial activities", "교육": "educational services",
+        "환경": "waste management", "제약": "pharmaceutical",
+    }
+
+    def _translate_keyword(self, keyword: str) -> str:
+        """한국어 키워드 → 영어 변환 (Census API 영문 레이블 매칭용)"""
+        for ko, en in self._KO_EN_MAP.items():
+            if ko in keyword:
+                return en
+        return keyword  # 이미 영문이거나 미지원 → 원본 반환
+
     # NAICS 2자리 주요 섹터
     _NAICS_SECTORS = {
         "11": "농림어업", "21": "광업", "22": "공공서비스",
@@ -280,27 +444,29 @@ class IndustryConnector:
     }
 
     def search_naics(self, keyword: str, api_key: str = "") -> dict:
-        """NAICS 코드 키워드 검색"""
+        """NAICS 코드 키워드 검색 (한국어 키워드 자동 영문 변환)"""
+        en_keyword = self._translate_keyword(keyword)
         try:
             key_param = f"&key={api_key}" if api_key else ""
             url = f"{self.CENSUS_API}?get=NAICS2022,NAICS2022_LABEL&for=us:*{key_param}"
             data = _get(url)
-            # 키워드 필터 (로컬)
-            matched = [row for row in data[1:] if keyword.lower() in row[1].lower()][:5]
+            matched = [row for row in data[1:]
+                       if en_keyword.lower() in row[1].lower()][:5]
             return {
-                "source": "US Census NAICS 2022",
-                "keyword": keyword,
-                "matches": [{"code": r[0], "label": r[1]} for r in matched],
+                "source":     "US Census NAICS 2022",
+                "keyword":    keyword,
+                "translated": en_keyword if en_keyword != keyword else None,
+                "matches":    [{"code": r[0], "label": r[1]} for r in matched],
             }
         except Exception:
-            # 정적 폴백
             matched = [(k, v) for k, v in self._NAICS_SECTORS.items()
-                       if keyword.lower() in v.lower()]
+                       if en_keyword.lower() in v.lower() or keyword.lower() in v.lower()]
             return {
-                "source": "NAICS 2022 (정적 폴백)",
-                "keyword": keyword,
-                "matches": [{"code": k, "label": v} for k, v in matched[:5]],
-                "full_api": "https://api.census.gov/data/2022/naics",
+                "source":     "NAICS 2022 (정적 폴백)",
+                "keyword":    keyword,
+                "translated": en_keyword if en_keyword != keyword else None,
+                "matches":    [{"code": k, "label": v} for k, v in matched[:5]],
+                "full_api":   "https://api.census.gov/data/2022/naics",
             }
 
     def isic_map(self, naics_code: str) -> dict:
@@ -396,20 +562,32 @@ class CompanyConnector:
     OPENCORP_API     = "https://api.opencorporates.com/v0.4"
 
     def search_lei(self, company_name: str) -> dict:
-        """회사명 → LEI 코드 조회 (GLEIF, 무료)"""
+        """회사명 → LEI 코드 조회 (GLEIF, 무료) — /lei-records?filter[entity.legalName] 사용"""
         try:
             encoded = urllib.parse.quote(company_name)
-            url  = f"{self.GLEIF_API}/fuzzycompletions?field=fullLegalName&q={encoded}"
-            data = _get(url)
+            # fuzzycompletions는 400 오류 → lei-records filter 방식 사용 (실측 200 OK)
+            url = (f"{self.GLEIF_API}/lei-records"
+                   f"?filter[entity.legalName]={encoded}&page[size]=5")
+            req = urllib.request.Request(url, headers={
+                "Accept": "application/vnd.api+json",
+                "User-Agent": "IPInsight/1.0",
+            })
+            with urllib.request.urlopen(req, timeout=10) as r:
+                data = json.loads(r.read())
             entities = data.get("data", [])[:5]
             return {
-                "source": "GLEIF LEI Registry",
-                "query":  company_name,
+                "source":  "GLEIF LEI Registry",
+                "query":   company_name,
+                "total":   data.get("meta", {}).get("total", len(entities)),
                 "results": [
                     {
-                        "lei":          e.get("id"),
-                        "legal_name":   e.get("attributes", {}).get("value", ""),
-                        "country":      e.get("attributes", {}).get("country", ""),
+                        "lei":        e.get("id", ""),
+                        "legal_name": e.get("attributes", {}).get("entity", {})
+                                       .get("legalName", {}).get("name", ""),
+                        "country":    e.get("attributes", {}).get("entity", {})
+                                       .get("legalAddress", {}).get("country", ""),
+                        "status":     e.get("attributes", {}).get("entity", {}).get("status", ""),
+                        "jurisdiction": e.get("attributes", {}).get("entity", {}).get("jurisdiction", ""),
                     }
                     for e in entities
                 ],
@@ -541,18 +719,21 @@ class CodeLinkerPipeline:
         self.policy     = PolicyConnector()
         # Phase 1 Connectors (즉시연결 DB)
         try:
-            from pipeline.connectors import PaperConnector, MarketConnector, ClinicalConnector, ESGConnector
+            from pipeline.connectors import (PaperConnector, MarketConnector,
+                                              ClinicalConnector, ESGConnector, TradeConnector)
             from pipeline.connectors.regional_connector import RegionalConnector
         except ImportError:
-            from connectors import PaperConnector, MarketConnector, ClinicalConnector, ESGConnector
+            from connectors import (PaperConnector, MarketConnector,
+                                    ClinicalConnector, ESGConnector, TradeConnector)
             from connectors.regional_connector import RegionalConnector
         self.paper    = PaperConnector()
         self.market   = MarketConnector()
         self.clinical = ClinicalConnector()
         self.esg      = ESGConnector()
+        self.trade    = TradeConnector()
         self.regional = RegionalConnector()
 
-    def run(self, tech_id: str, params: dict) -> CodeContext:
+    def run(self, tech_id: str, params: dict, stage: str = "ALL") -> CodeContext:
         """
         params:
           cpc_codes        list[str]   예: ["Y02E", "A01G"]
@@ -568,133 +749,160 @@ class CodeLinkerPipeline:
           org_name         str         예: "KAIST"
           policy_country   str         예: "KR"
           ntis_api_key     str         (선택)
+
+        stage: G0~G10 또는 "ALL" — QueryRouter가 불필요한 커넥터를 자동 스킵
         """
+        from pipeline.query_router import QueryRouter
+        _regions    = params.get("target_markets", ["KR"])
+        _tech_type  = params.get("tech_type", "software_saas")
+        _decision   = QueryRouter().route(stage, _tech_type, _regions)
+        _active     = set(_decision.connectors)  # 이 스테이지에서 실행할 커넥터 집합
+
         ctx = CodeContext(tech_id=tech_id)
+        ctx.route_decision = _decision.summary()
 
-        # 1. 특허 IPC/CPC
-        try:
-            cpc = params.get("cpc_codes", ["A01"])[0]
-            ctx.patent = {
-                "cpc_search":    self.patent.search_by_cpc(cpc, limit=3),
-                "fto_landscape": self.patent.fto_landscape(params.get("ipc_codes", [cpc])),
-            }
-        except Exception as e:
-            ctx.errors.append(f"patent: {e}")
+        # ── 커넥터별 작업 클로저 정의 (ALL 스테이지 36.5s → <10s 병렬화) ───────
+        import os as _os
+        _jobs: dict = {}
 
-        # 2. 기술코드 CPC-Y / KSTC
-        try:
-            ctx.technology = self.tech.classify(
-                params.get("cpc_codes", []),
-                params.get("kstc_codes", []),
-            )
-            if params.get("ntis_api_key"):
-                ctx.technology["ntis"] = self.tech.ntis_search(
-                    params.get("industry_keyword", ""), params["ntis_api_key"]
+        if "patent" in _active:
+            _cpc = params.get("cpc_codes", ["A01"])[0]
+            _ipc = params.get("ipc_codes", [_cpc])
+            def _j_patent(_c=_cpc, _i=_ipc):
+                return {
+                    "cpc_search":    self.patent.search_by_cpc(_c, limit=3),
+                    "fto_landscape": self.patent.fto_landscape(_i),
+                }
+            _jobs["patent"] = _j_patent
+
+        if "technology" in _active:
+            _ntis_key = params.get("ntis_api_key") or _os.environ.get("NTIS_API_KEY", "")
+            def _j_tech(_k=_ntis_key):
+                result = self.tech.classify(
+                    params.get("cpc_codes", []),
+                    params.get("kstc_codes", []),
                 )
-        except Exception as e:
-            ctx.errors.append(f"technology: {e}")
+                if _k:
+                    result["ntis"] = self.tech.ntis_search(
+                        params.get("industry_keyword", ""), _k
+                    )
+                return result
+            _jobs["technology"] = _j_tech
 
-        # 3. WIPO PCT
-        try:
-            ctx.wipo = self.wipo.pct_strategy(
-                params.get("target_markets", ["US", "EP", "KR"]),
-                params.get("nice_classes", [42]),
-            )
-        except Exception as e:
-            ctx.errors.append(f"wipo: {e}")
+        if "wipo" in _active:
+            def _j_wipo():
+                return self.wipo.pct_strategy(
+                    params.get("target_markets", ["US", "EP", "KR"]),
+                    params.get("nice_classes", [42]),
+                )
+            _jobs["wipo"] = _j_wipo
 
-        # 4. 산업코드 NAICS
-        try:
-            keyword = params.get("industry_keyword", "")
-            ctx.industry = {
-                "naics_search": self.industry.search_naics(keyword),
-                "isic_map":     self.industry.isic_map(params.get("naics_code", "54")),
-            }
-        except Exception as e:
-            ctx.errors.append(f"industry: {e}")
+        if "industry" in _active:
+            _kw      = params.get("industry_keyword", "")
+            _naics_c = params.get("naics_code", "54")
+            def _j_industry(_k=_kw, _n=_naics_c):
+                return {
+                    "naics_search": self.industry.search_naics(_k),
+                    "isic_map":     self.industry.isic_map(_n),
+                }
+            _jobs["industry"] = _j_industry
 
-        # 5. 규제코드
-        try:
-            ctx.regulatory = self.regulatory.get_regulatory_path(
-                params.get("tech_type", "software_saas"),
-                params.get("reg_markets", ["US", "EU", "KR"]),
-            )
-        except Exception as e:
-            ctx.errors.append(f"regulatory: {e}")
-
-        # 6. 기업코드 LEI
-        try:
-            company = params.get("company_name", "")
-            if company:
-                ctx.company = self.company.search_lei(company)
-        except Exception as e:
-            ctx.errors.append(f"company: {e}")
-
-        # 7. 정책코드 ROR / NTIS
-        try:
-            org = params.get("org_name", "")
-            ctx.policy = {
-                "programs":   self.policy.policy_programs(
+        if "regulatory" in _active:
+            def _j_regulatory():
+                return self.regulatory.get_regulatory_path(
                     params.get("tech_type", "software_saas"),
-                    params.get("policy_country", "KR"),
-                ),
-                "ror_search": self.policy.search_ror(org) if org else {},
-            }
-        except Exception as e:
-            ctx.errors.append(f"policy: {e}")
-
-        # 8. 논문·R&D (OpenAlex + PubMed + EuropePMC)
-        try:
-            query = params.get("tech_name", params.get("industry_keyword", ""))
-            if query:
-                ctx.paper = self.paper.trl_evidence(query)
-        except Exception as e:
-            ctx.errors.append(f"paper: {e}")
-
-        # 9. 시장·경제 (World Bank + OECD)
-        try:
-            ctx.market = self.market.market_summary(
-                params.get("tech_type", "software_saas"),
-                params.get("target_markets", ["US", "KR"]),
-            )
-        except Exception as e:
-            ctx.errors.append(f"market: {e}")
-
-        # 10. 임상·규제 근거 (ClinicalTrials + EUDAMED)
-        try:
-            tech_name = params.get("tech_name", params.get("industry_keyword", ""))
-            if tech_name:
-                ctx.clinical = self.clinical.regulatory_benchmark(
-                    tech_name, params.get("tech_type", "medical_device")
+                    params.get("reg_markets", ["US", "EU", "KR"]),
                 )
-        except Exception as e:
-            ctx.errors.append(f"clinical: {e}")
+            _jobs["regulatory"] = _j_regulatory
 
-        # 11. ESG·탄소 (Climate TRACE + Our World in Data)
-        try:
-            sector_map = {
+        if "company" in _active:
+            _company = params.get("company_name", "")
+            if _company:
+                def _j_company(_c=_company):
+                    return self.company.search_lei(_c)
+                _jobs["company"] = _j_company
+
+        if "policy" in _active:
+            _org = params.get("org_name", "")
+            def _j_policy(_o=_org):
+                return {
+                    "programs":   self.policy.policy_programs(
+                        params.get("tech_type", "software_saas"),
+                        params.get("policy_country", "KR"),
+                    ),
+                    "ror_search": self.policy.search_ror(_o) if _o else {},
+                }
+            _jobs["policy"] = _j_policy
+
+        if "paper" in _active:
+            _q = params.get("tech_name", params.get("industry_keyword", ""))
+            if _q:
+                def _j_paper(_qq=_q):
+                    return self.paper.trl_evidence(_qq)
+                _jobs["paper"] = _j_paper
+
+        if "market" in _active:
+            def _j_market():
+                return self.market.market_summary(
+                    params.get("tech_type", "software_saas"),
+                    params.get("target_markets", ["US", "KR"]),
+                )
+            _jobs["market"] = _j_market
+
+        if "clinical" in _active:
+            _tn = params.get("tech_name", params.get("industry_keyword", ""))
+            _tt = params.get("tech_type", "medical_device")
+            if _tn:
+                def _j_clinical(_n=_tn, _t=_tt):
+                    result = self.clinical.regulatory_benchmark(_n, _t)
+                    if _t == "medical_device":
+                        result["fda_510k"] = self.clinical.fda_device_clearance(_n)
+                    return result
+                _jobs["clinical"] = _j_clinical
+
+        if "esg" in _active:
+            _sector_map = {
                 "agritech": "agriculture", "energy": "power",
                 "manufacturing": "manufacturing", "software_saas": "buildings",
             }
-            ct_sector = sector_map.get(params.get("tech_type", ""), "manufacturing")
-            ctx.esg = self.esg.esg_summary(
-                params.get("tech_type", ""),
-                ct_sector,
-                params.get("efficiency_pct", 10.0),
-                params.get("target_markets", ["KR"]),
-            )
-        except Exception as e:
-            ctx.errors.append(f"esg: {e}")
+            _ct_sector = _sector_map.get(params.get("tech_type", ""), "manufacturing")
+            def _j_esg(_s=_ct_sector):
+                return self.esg.esg_summary(
+                    params.get("tech_type", ""),
+                    _s,
+                    params.get("efficiency_pct", 10.0),
+                    params.get("target_markets", ["KR"]),
+                )
+            _jobs["esg"] = _j_esg
 
-        # 12. 4개 지역 통합 분석 (KR·US·EU·DEV)
-        try:
-            target = params.get("target_markets", ["KR"])
-            tech_t = params.get("tech_type", "software_saas")
-            regional_ctx = self.regional.analyze(target, tech_t,
-                                                  params.get("efficiency_pct", 10.0))
-            ctx.regional = regional_ctx.to_dict()
-        except Exception as e:
-            ctx.errors.append(f"regional: {e}")
+        if "regional" in _active:
+            def _j_regional():
+                return self.regional.analyze(
+                    _regions, _tech_type, params.get("efficiency_pct", 10.0)
+                ).to_dict()
+            _jobs["regional"] = _j_regional
+
+        if "trade" in _active:
+            def _j_trade():
+                return self.trade.sector_trade_summary(
+                    _tech_type,
+                    reporters=_regions[:5],
+                    period=params.get("trade_period", "2022"),
+                )
+            _jobs["trade"] = _j_trade
+
+        # ── 병렬 실행 (ThreadPoolExecutor, 최대 8스레드) ──────────────────────
+        if _jobs:
+            with ThreadPoolExecutor(max_workers=min(len(_jobs), 8)) as pool:
+                fs = {pool.submit(fn): name for name, fn in _jobs.items()}
+                for future in as_completed(fs):
+                    name = fs[future]
+                    try:
+                        result = future.result(timeout=30)
+                        if result is not None:
+                            setattr(ctx, name, result)
+                    except Exception as e:
+                        ctx.errors.append(f"{name}: {e}")
 
         return ctx
 

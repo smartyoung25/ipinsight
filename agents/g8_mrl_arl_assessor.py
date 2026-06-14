@@ -1,4 +1,4 @@
-"""G8 MRL·ARL 3중 성숙도 평가 — DoD MRL + DOE ARL 5차원 독립 평가 + NIST MEP
+"""G8 MRL·ARL 3중 성숙도 평가 — DoD MRL + DOE ARL 5차원 + NIST MEP + 공급망 실데이터
 
 DOE ARL 5차원 독립 평가 (v2 — 공식 표준 정합):
   market(25%)   : 시장 수요 증거 단계
@@ -9,6 +9,10 @@ DOE ARL 5차원 독립 평가 (v2 — 공식 표준 정합):
 
 ARL 최종 = 5차원 가중평균 − 병목 패널티
 병목 원칙: 단일 차원 ARL <= 2이면 전체 ARL 최대 4로 제한
+
+공급망 실데이터 (TradeConnector):
+  auto_supply_chain_data 파라미터 제공 시 UN Comtrade / World Bank 무역 통계로
+  ecosystem 차원 점수를 자동 보강 (수출국 다양성 → 공급망 리스크 측정)
 """
 from __future__ import annotations
 from .base_agent import BaseAgent, StageResult
@@ -51,6 +55,9 @@ class MRLARLAssessor(BaseAgent):
           ecosystem_partner_count (int): 파트너 수
           ecosystem_integration_done (bool): 통합 구현 완료
         """
+        # 공급망 실데이터 자동 보강 — auto_supply_chain_data 제공 시 활용
+        input_data = self._enrich_with_supply_chain(input_data)
+
         mrl = self._assess_mrl(input_data)
         arl_5d = self._assess_arl_5d(input_data)
         arl = arl_5d["arl_final"]
@@ -262,6 +269,33 @@ class MRLARLAssessor(BaseAgent):
         if pilot_rev >= 50_000:
             return 6
         return 3
+
+    def _enrich_with_supply_chain(self, d: dict) -> dict:
+        """auto_supply_chain_data 있으면 ecosystem 파라미터 자동 보강"""
+        sc = d.get("auto_supply_chain_data", {})
+        if not sc:
+            return d
+        d = dict(d)
+        # 수출국 다양성 → 공급망 파트너 수 추론
+        export_countries = sc.get("top_exporters", [])
+        if export_countries and not d.get("ecosystem_partner_count"):
+            d["ecosystem_partner_count"] = min(len(export_countries), 5)
+        # 무역량 > 0 → 통합 완료 신호
+        trade_value = sc.get("total_trade_value_usd", 0)
+        if trade_value > 0 and not d.get("ecosystem_integration_done"):
+            d["ecosystem_integration_done"] = True
+        # 공급망 리스크 점수 (HHI 기반) → MRL 보정
+        hhi = sc.get("concentration_hhi", 1.0)
+        if hhi < 0.25 and not d.get("supply_chain_ready"):
+            # 낮은 HHI = 분산된 공급망 = 리스크 낮음 → supply_chain_ready 추론
+            d["supply_chain_ready"] = True
+        d["_supply_chain_enriched"] = {
+            "source": sc.get("source", "TradeConnector"),
+            "exporters_used": len(export_countries),
+            "hhi": hhi,
+            "trade_value_usd": trade_value,
+        }
+        return d
 
     def _arl_ecosystem(self, d: dict) -> int:
         partners = d.get("ecosystem_partner_count", 0)

@@ -1,48 +1,38 @@
-# 다음 세션 첫 번째 명령
+# NEXT — 다음 세션 시작점
+> 생성: 2026-06-14 / 테스트: 216개 전부 통과
 
-## 상태
-**완료**: 글로벌 벤치마크 경쟁력 수정 8개 (63 → 84점)
+## 현재 상태 (1줄)
+Groq LLM 완전 연동 완료 — PCML(llama-3.3-70b) + SCR(llama-3.3-70b) 실 분석 정상 작동, 경고 없음.
 
-| # | 수정 내용 | 커밋 |
-|---|-----------|------|
-| ① | G6 주법 교체: TRL<7 → 로열티구제법 주법 (Stanford OTL/MIT TLO/AICPA) | b99a504 |
-| ② | G4 JTBD 3차원 + NSF I-Corps 100건 기준 | b99a504 |
-| ③ | G8 규제 경로 Gate 패널티 연결 (EIC Accelerator) | b99a504 |
-| ④ | G1-Whitespace 신규: WIPO FTO + White Space 2축 완성 | b99a504 |
-| ⑤ | G8 ARL 5차원 독립 평가 — DOE 공식 표준 완전 정합 | ea4b1ab |
-| ⑥ | G6 Monte Carlo 4변수 독립 샘플링·TRL연동·P10/P50/P90 시나리오 | 9e80b12 |
-| ⑦ | G9 Venture Client Model (BMW i Ventures 5개사 벤치마크) | 9e80b12 |
-| ⑧ | G10 BCG X축 객관화 (IP강도·TRL·ARL 복합) + 예산배분 3모드 | 9e80b12 |
+## 이번 세션 목표 (1개만)
+[x] Groq LLM 실 분석 품질 검증 완료 (PCML Gate=Go/Score=80, SCR Gate=G2/Score=75, Gap=5)
 
-## 다음 세션 시작 명령
+## 다음 3개 작업 (우선순위 순)
+1. 216개 테스트 실행 확인 (`cd C:\IPinsight && python -m pytest -x -q`)
+2. PCML Gate=Hold/Kill 유도 특허로 경계값 검증 (약한 청구항 입력)
+3. G2→G3 연속 파이프라인 엔드포인트 (`/ip/analyze-chain-extended`)
+
+## 열린 문제 / 블로커
+- Anthropic 크레딧 부족 → Groq로 대체 완료, 문제없음
+- KIPRIS_API_KEY 미설정 → patent_text 직접 입력으로 우회 가능
+- Groq 429 (rate limit) 간헐적 발생 → openai SDK 자동 재시도로 처리됨
+
+## 서버 실행 (복붙용)
 ```powershell
-cd C:\IPinsight_a
+cd C:\IPinsight
 $env:PYTHONIOENCODING="utf-8"
-python tests\test_agents.py
-python tests\test_v3_fixes.py
-python tests\test_arl_5d.py
-python tests\test_ip_lifecycle.py
-python tests\test_v5_improvements.py
+python -m uvicorn api.main:app --port 8001
 ```
-→ 5개 테스트 전부 통과 확인 후 SPRINT.md 확인하여 다음 목표 논의
 
-## 다음 목표 후보
+## 주의사항
+- pytest: **반드시 `cd C:\IPinsight`에서** 실행
+- PCML `release_status`: releasable | **internal_only** | blocked (**partial 아님**)
+- 에이전트 메서드: `.assess(input_data: dict)` (`.run()` 아님)
+- PitchBook·IBISWorld 절대 통합 금지
+- SCR JSON 파싱: 마크다운 코드블록 제거 + 불완전 JSON 자동 복구 로직 내장
 
-### C. 실사용 테스트 (권장 다음 단계)
-- FastAPI 서버 기동 (`uvicorn api.main:app --port 8100 --reload`)
-- Swagger UI (http://localhost:8100/docs) 에서 전 엔드포인트 확인
-- 실제 기술 사례 1개로 G0→G10 전 파이프라인 실행
-- `POST /ip/pipeline/run` 엔드포인트 동작 확인
-
-### D. DECISIONS.md 업데이트 (선택)
-- v5 수정 결정 3건 기록
-
-## 절대 잊으면 안 되는 것
-- ARL = Adoption Readiness Level (DOE 공식) — BRL이 아님
-- ARL 5차원: market(25%) customer(25%) regulatory(20%) economic(20%) ecosystem(10%)
-- 병목 원칙: 단일 차원 ARL<=2 → 전체 최대 ARL 4
-- G6: TRL<7 → 로열티구제법 주법, TRL>=7 → DCF 주법
-- G9: Venture Client = 대기업 첫 유료 고객, 지분 희석 없음
-- G10 BCG X축: competitive_score = 자기선언(35%) + 특허수명(25%) + TRL(20%) + ARL(20%)
-- Monte Carlo: TRL 낮을수록 rev_std 커짐 (trl_factor = (9-trl)/9)
-- PowerShell: `&&` 없음, `$env:PYTHONIOENCODING="utf-8"` 필수 (한글 출력)
+## 다음 스프린트 후보
+- FTO 보고서 (G1)
+- 클레임 차트 자동 생성
+- G2→G5 연속 파이프라인 엔드포인트
+- 보고서 영속화 (SQLite)

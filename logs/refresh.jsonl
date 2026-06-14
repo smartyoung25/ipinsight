@@ -1,0 +1,8 @@
+{"ts": 1781396025.909586, "target": "patent", "label": "AgriTech CPC", "status": "dry_run_skipped", "connector": "PatentConnector", "method": "search_by_cpc", "elapsed_s": 0.0}
+{"ts": 1781396025.909586, "target": "patent", "label": "CleanEnergy CPC", "status": "dry_run_skipped", "connector": "PatentConnector", "method": "search_by_cpc", "elapsed_s": 0.0}
+{"ts": 1781396025.909586, "target": "patent", "label": "Pharma CPC", "status": "dry_run_skipped", "connector": "PatentConnector", "method": "search_by_cpc", "elapsed_s": 0.0}
+{"ts": 1781396025.909586, "target": "market", "label": "주요6국 GDP·R&D", "status": "dry_run_skipped", "connector": "MarketConnector", "method": "gdp_indicators", "elapsed_s": 0.0}
+{"ts": 1781396025.909586, "target": "market", "label": "AgriTech TAM", "status": "dry_run_skipped", "connector": "MarketConnector", "method": "tam_estimate", "elapsed_s": 0.0}
+{"ts": 1781396025.909586, "target": "market", "label": "SaaS TAM", "status": "dry_run_skipped", "connector": "MarketConnector", "method": "tam_estimate", "elapsed_s": 0.0}
+{"ts": 1781396025.909586, "target": "market", "label": "에너지 TAM", "status": "dry_run_skipped", "connector": "MarketConnector", "method": "tam_estimate", "elapsed_s": 0.0}
+{"ts": 1781396025.909586, "summary": true, "ok": 7, "err": 0, "elapsed_s": 0.0}

@@ -38,6 +38,13 @@ class CustomerValidator(BaseAgent):
         gate = self._gate_from_score(score)
         output_doc = self._build_output(input_data, score)
         warnings = self._warnings(input_data)
+
+        # LoI 1건 이상 확보 시 → LoI 표준 양식 자동 생성
+        loi_count = input_data.get("loi_count", 0)
+        poc_req   = input_data.get("poc_requests", 0)
+        if loi_count >= 1 or poc_req >= 1:
+            output_doc["loi_template"] = self._generate_loi_template(input_data)
+
         return StageResult(
             stage=self.stage_id, score=score, gate=gate,
             output_doc=output_doc,
@@ -177,6 +184,122 @@ class CustomerValidator(BaseAgent):
             "새로운 해결책에 연간 얼마를 지불할 의향이 있습니까?",
             "도입 결정권자는 누구입니까? 예산 승인 프로세스는?",
         ]
+
+    def _generate_loi_template(self, d: dict) -> dict:
+        """LoI(도입의향서 / Letter of Intent) 표준 양식 자동 생성.
+
+        KIAT·KEIT 협약 및 TIPS 투자심사 제출용 표준 형식.
+        수신처·조건은 실제 인터뷰 데이터에서 자동 추출.
+        """
+        from datetime import date
+
+        interviews = d.get("interviews", [])
+        tech_name  = d.get("tech_name", "대상 기술/서비스")
+        tech_org   = d.get("tech_org",  "[기술 보유 기관/기업명]")
+        loi_count  = d.get("loi_count", 0)
+        poc_req    = d.get("poc_requests", 0)
+
+        # 평균 WTP 산출
+        wtp_vals = [i.get("willingness_to_pay", 0) for i in interviews if i.get("willingness_to_pay", 0) > 0]
+        avg_wtp  = round(sum(wtp_vals) / max(len(wtp_vals), 1), 0)
+
+        # 주요 Pain Point 상위 3개 추출
+        pain_points = list(dict.fromkeys(
+            i["pain_point"] for i in interviews if i.get("pain_point")
+        ))[:3]
+
+        # 고객 세그먼트 대표값
+        customer_types = list(dict.fromkeys(
+            i["customer_type"] for i in interviews if i.get("customer_type")
+        ))[:3]
+
+        # LLM 보강 — LoI 구체화
+        llm_body = self._llm(
+            f"기술명: {tech_name}\n"
+            f"고객 유형: {customer_types}\n"
+            f"핵심 Pain Point: {pain_points}\n"
+            f"평균 WTP: ${avg_wtp:,.0f}/년\n"
+            f"LoI 확보 수: {loi_count}, PoC 요청: {poc_req}\n\n"
+            "표준 도입의향서(LoI) 핵심 조항 3개와 PoC 조건을 JSON으로:\n"
+            '{"intent_clauses":[],"poc_conditions":[],"evaluation_criteria":[],"exclusivity_note":""}',
+            system="기술사업화 계약 전문가. 법적 효력 없는 의향서 초안용 JSON만 반환."
+        )
+        try:
+            import json
+            llm_out = json.loads(llm_body)
+        except Exception:
+            llm_out = {
+                "intent_clauses": [
+                    f"{tech_name} 기술의 도입 검토 의향을 표명함",
+                    f"6개월 이내 PoC 또는 파일럿 프로그램 참여 의사 있음",
+                    f"연간 도입 예산 검토 중 (예상 ${avg_wtp:,.0f}/년)",
+                ],
+                "poc_conditions": [
+                    "3개월 무료 파일럿 또는 성과 기반 과금",
+                    "성능 목표 미달 시 계약 해제 가능",
+                ],
+                "evaluation_criteria": ["기존 대비 생산성 20% 향상", "도입 후 3개월 내 ROI 확인"],
+                "exclusivity_note": "본 LoI는 법적 구속력 없는 의향 표명이며 독점 계약이 아님",
+            }
+
+        return {
+            "document_type": "도입의향서 (Letter of Intent)",
+            "document_status": "초안 (Draft) — 법적 검토 필요",
+            "generated_date": date.today().isoformat(),
+            "notice": "본 양식은 자동 생성 초안입니다. 법무 검토 후 사용하십시오.",
+            "header": {
+                "title": f"[{tech_name}] 기술 도입의향서",
+                "ref_no": f"LOI-{date.today().strftime('%Y%m%d')}-001",
+                "date": date.today().isoformat(),
+            },
+            "parties": {
+                "issuer": {
+                    "role": "기술 도입 의향 기관 (수요처)",
+                    "name": "[수요처 기관명]",
+                    "representative": "[대표자명]",
+                    "address": "[주소]",
+                },
+                "recipient": {
+                    "role": "기술 보유 기관 (공급자)",
+                    "name": tech_org,
+                    "representative": "[대표자/담당자명]",
+                },
+            },
+            "technology_overview": {
+                "tech_name": tech_name,
+                "description": f"[{tech_name}] 기술의 핵심 기능 및 적용 범위 서술",
+                "target_customer_types": customer_types,
+                "key_pain_points_addressed": pain_points,
+            },
+            "intent_clauses": llm_out.get("intent_clauses", []),
+            "poc_plan": {
+                "conditions": llm_out.get("poc_conditions", []),
+                "evaluation_criteria": llm_out.get("evaluation_criteria", []),
+                "duration": "3개월 (협의 조정 가능)",
+                "proposed_budget_usd": avg_wtp * 0.1 if avg_wtp > 0 else 0,
+            },
+            "commercial_intent": {
+                "annual_budget_usd": avg_wtp,
+                "procurement_timeline": "PoC 완료 후 6개월 이내 도입 여부 결정",
+                "decision_maker": "[구매 결정권자 직함]",
+                "budget_approval_process": "[예산 승인 절차 기재]",
+            },
+            "exclusivity_note": llm_out.get("exclusivity_note", "본 LoI는 법적 구속력 없는 의향 표명"),
+            "signature_block": {
+                "issuer_signature": "___________________",
+                "issuer_title": "[직위]",
+                "issuer_date": "____년 ____월 ____일",
+                "recipient_signature": "___________________",
+                "recipient_title": "[직위]",
+                "recipient_date": "____년 ____월 ____일",
+            },
+            "usage_notes": [
+                "본 LoI는 투자자 제출용 수요 검증 증빙 자료로 활용 가능",
+                "TIPS/KEIT 과제 신청 시 수요처 확인서로 제출 가능",
+                "법적 계약은 별도 기술이전계약서(G7) 또는 NDA 체결 필요",
+                f"현재 확보 LoI {loi_count}건 / PoC 요청 {poc_req}건",
+            ],
+        }
 
     def _warnings(self, d: dict) -> list[str]:
         w = []

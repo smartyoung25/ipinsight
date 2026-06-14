@@ -1,7 +1,71 @@
-"""G10 성과관리·환류 — Horizon Europe + ISO 혁신관리 + 실시간 KPI"""
+"""G10 성과관리·환류 — Horizon Europe + ISO 혁신관리 + 실시간 KPI 피드 + SQLite 영속화"""
 from __future__ import annotations
+import json
+import sqlite3
 from datetime import datetime
+from pathlib import Path
 from .base_agent import BaseAgent, StageResult
+
+# SQLite KPI 스토어 — 재시작 후에도 KPI 이력 유지
+_KPI_DB_PATH = Path(__file__).parent.parent / "data" / "kpi_store.db"
+_KPI_DB_PATH.parent.mkdir(exist_ok=True)
+
+
+def _get_db() -> sqlite3.Connection:
+    conn = sqlite3.connect(str(_KPI_DB_PATH), check_same_thread=False)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS kpi_events (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            tech_id     TEXT NOT NULL,
+            kpi_key     TEXT NOT NULL,
+            value       REAL NOT NULL,
+            recorded_at TEXT NOT NULL,
+            source      TEXT DEFAULT 'manual',
+            note        TEXT
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_kpi_tech ON kpi_events(tech_id, kpi_key)")
+    conn.commit()
+    return conn
+
+
+def record_kpi_event(tech_id: str, kpi_key: str, value: float,
+                     source: str = "manual", note: str = "") -> int:
+    """KPI 이벤트 단건 기록 → row_id 반환"""
+    conn = _get_db()
+    cur = conn.execute(
+        "INSERT INTO kpi_events (tech_id, kpi_key, value, recorded_at, source, note) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (tech_id, kpi_key, value, datetime.utcnow().isoformat(), source, note),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def get_kpi_feed(tech_id: str, limit: int = 50) -> list[dict]:
+    """tech_id의 최근 KPI 이벤트 목록 (최신순)"""
+    conn = _get_db()
+    rows = conn.execute(
+        "SELECT id, kpi_key, value, recorded_at, source, note "
+        "FROM kpi_events WHERE tech_id=? ORDER BY id DESC LIMIT ?",
+        (tech_id, limit),
+    ).fetchall()
+    return [
+        {"id": r[0], "kpi_key": r[1], "value": r[2],
+         "recorded_at": r[3], "source": r[4], "note": r[5]}
+        for r in rows
+    ]
+
+
+def get_latest_kpis(tech_id: str) -> dict[str, float]:
+    """tech_id의 KPI별 최신 값 딕셔너리"""
+    conn = _get_db()
+    rows = conn.execute(
+        "SELECT kpi_key, value FROM kpi_events WHERE tech_id=? "
+        "AND id IN (SELECT MAX(id) FROM kpi_events WHERE tech_id=? GROUP BY kpi_key)",
+        (tech_id, tech_id),
+    ).fetchall()
+    return {r[0]: r[1] for r in rows}
 
 
 class PerformanceTracker(BaseAgent):
@@ -19,13 +83,36 @@ class PerformanceTracker(BaseAgent):
 
     def assess(self, input_data: dict) -> StageResult:
         """
-        input_data: tech_name, actuals (dict matching _KPI_TARGETS keys),
+        input_data: tech_id (str), tech_name, actuals (dict matching _KPI_TARGETS keys),
                     milestone_achievements (list of {name, target_date, actual_date, status}),
-                    portfolio_techs (list), feedback_actions (list)
+                    portfolio_techs (list), feedback_actions (list),
+                    use_kpi_store (bool): True이면 SQLite KPI 스토어의 최신값으로 actuals 보강
         """
+        tech_id = input_data.get("tech_id", "")
+
+        # SQLite KPI 스토어 자동 보강
+        if input_data.get("use_kpi_store") and tech_id:
+            stored = get_latest_kpis(tech_id)
+            if stored:
+                merged = dict(stored)
+                merged.update(input_data.get("actuals", {}))  # 입력값 우선
+                input_data = dict(input_data)
+                input_data["actuals"] = merged
+                input_data["_kpi_store_used"] = True
+                input_data["_kpi_store_keys"] = list(stored.keys())
+
         score = self._score(input_data)
         gate = self._gate_from_score(score)
         output_doc = self._build_output(input_data, score)
+
+        # 평가 완료 후 actuals를 KPI 스토어에 자동 기록
+        if tech_id:
+            for kpi, val in input_data.get("actuals", {}).items():
+                try:
+                    record_kpi_event(tech_id, kpi, float(val), source="assess")
+                except Exception:
+                    pass
+
         return StageResult(
             stage=self.stage_id, score=score, gate=gate,
             output_doc=output_doc,

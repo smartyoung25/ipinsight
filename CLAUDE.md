@@ -1,63 +1,133 @@
 # IPInsight — 글로벌 기술사업화 Agent OS
+> 세션 시작 시: NEXT.md만 읽을 것. 이 파일은 아키텍처 변경 시만 참조.
 
-## 프로젝트 개요
-글로벌 기술사업화 프로세스(G0~G10) 전주기를 AI Agent로 자동화하는 플랫폼.
-WIPO Lab-to-Market · NASA TRL · NSF I-Corps · DOE ARL · MRL 통합 설계.
+---
+
+## 영구 제약 (절대 위반 금지)
+
+- **PitchBook ($1,000+)** — 절대 통합 금지
+- **IBISWorld ($1,000+)** — 절대 통합 금지
+
+## 서버 실행
+
+```powershell
+cd C:\IPinsight
+$env:PYTHONIOENCODING="utf-8"
+python -m uvicorn api.main:app --port 8100 --reload
+python -m pytest tests/ -q    # 반드시 C:\IPinsight에서 실행
+```
+
+## 현재 테스트 현황 (216개 전부 통과)
+
+```
+tests/test_auth.py       — 15개 (JWT, bcrypt, 인증)
+tests/test_api.py        — 148개 (공개/보호/PCML v2.0/에이전트/비동기Job)
+tests/test_connectors.py — 53개 (KIPRIS/GooglePatents/ReportDeps/SCR/Reports/Deliverables)
+  TestDeliverables (추가): G5-CR 로드맵·G4 LoI·SMK 파이프라인 5개
+```
+
+## PCML v2.0 핵심 규칙 (절대 변경 금지)
+
+#### 6계층 아키텍처
+| 계층 | 이름 | 필수 여부 |
+|------|------|---------|
+| L1 | Patent Layer | 필수 |
+| L2 | Claim Graph Layer | 필수 (L1 전제) |
+| L3 | Specification Support Layer | 입력자료 있을 때 |
+| L4 | Metadata Layer | 입력자료 있을 때 |
+| L5 | Legal & Family Layer | 입력자료 있을 때 |
+| L6 | Enforcement Evidence Layer | 입력자료 있을 때 |
+
+#### 핵심 타입 제약
+- **Node element_class**: Core | Supporting | Peripheral (미부여 = QC FAIL)
+- **Node observability**: 0/25/50/75/100 (5단계)
+- **Link relation_type**: 13개 허용값만 (includes/has/performs/inputs/receives/outputs/transmits/controls/based_on/stores/retrieves/connected_to/depends_on)
+- **Attribute attr_type**: 12개 허용값 (algorithm/decision_rule/range/material/function 등)
+- **Release gate**: releasable | **internal_only** | blocked (partial 아님)
+- **QC FAIL** 5조건 × 20점 / **QC WARN** 10조건 × 5점 / QC_grade A~D
+- **Shared Variables** 9종: self_core_nodes, self_core_links, support_coverage, explicit_support_ratio, evidence_linkage_ratio, black_box_core_ratio, claim_clarity_penalty, legal_status_score, family_coverage_rate
+
+#### ⚠️ None-Safe 패턴 (screening_agent.py 버그 이력)
+```python
+# shared.get("key", 0) 은 None 반환 가능 — or 패턴 필수
+value = shared.get("key") or 0          # 0 기본값
+ratio = shared.get("ratio") if shared.get("ratio") is not None else 0.5  # 0.5 기본값
+```
+
+## 인증 아키텍처 결정사항
+
+- **bcrypt**: passlib 1.7.4 + bcrypt==4.0.1 핀 (`requirements.txt`)
+- **SHA-256 폴백**: 고정 솔트 `"ipinsight-default-salt-v1"` (JWT_SECRET_KEY 없을 때)
+- **개발 모드 자동 통과**: JWT_SECRET_KEY + ADMIN_API_KEY 모두 미설정 시
+- **POST 전체 인증**: `post_auth_gate` HTTP 미들웨어
+- **미들웨어 역순 실행**: 마지막 등록 = 첫 실행 → post_auth_gate가 logging보다 먼저 실행
+- **users.json**: `api/data/users.json` (admin/admin1234 SHA-256 해시)
 
 ## 디렉토리 구조
+
 ```
-IPinsight_a/
-├── agents/                  # G0~G10 단계별 Agent 모듈
-│   ├── g0_tech_scout.py     # 기술후보 발굴·등록
-│   ├── g1_ip_structurer.py  # IP 구조화·FTO 분석
-│   ├── g2_trl_assessor.py   # TRL 자동 평가
-│   ├── g3_market_scanner.py # 시장성·산업매력도
-│   ├── g4_customer_validator.py  # 고객발견·수요검증
-│   ├── g5_bm_designer.py    # 사업모델·GTM 설계
-│   ├── g6_valuation_engine.py    # IP·기술 가치평가
-│   ├── g7_poc_manager.py    # PoC·실증·위험저감
-│   ├── g8_mrl_arl_assessor.py    # MRL·ARL 3중 평가
-│   ├── g9_deal_structurer.py     # 거래·투자 결정
-│   └── g10_performance_tracker.py # 성과관리·환류
-├── knowledge/               # 정적 지식 DB (JSON)
-│   ├── trl_framework.json
-│   ├── mrl_framework.json
-│   ├── arl_framework.json
-│   ├── country_programs.json
-│   ├── royalty_benchmarks.json
-│   └── regulatory_paths.json
-├── pipeline/
-│   ├── phase_gate_pipeline.py  # G0~G10 Stage Gate 실행
-│   └── funding_matcher.py      # 단계별 정부지원 매칭
+C:\IPinsight\
+├── agents/
+│   ├── base_agent.py              # BaseAgent (LLM + RAG + 규칙폴백)
+│   ├── pcml_agent.py              # PCML v2.0 (6계층, L1~L6)
+│   ├── screening_agent.py         # G1.6-SCR 신규성 스크리닝
+│   ├── g0_tech_scout.py ~ g10_performance_tracker.py
+│   ├── g5_commercialization_roadmap.py  # G5-CR KIAT/KEIT 로드맵
+│   └── smk_generator.py           # G3+G4+G5 통합 SMK
 ├── api/
-│   ├── main.py              # FastAPI 앱
-│   └── schemas.py           # Pydantic 모델
-├── outputs/                 # 산출물 저장 (JSON/PDF)
-└── tests/                   # 단위 테스트
+│   ├── main.py                    # FastAPI 앱 (47+ 엔드포인트)
+│   ├── schemas.py                 # Pydantic 스키마 10종
+│   ├── auth.py                    # JWT + API Key + bcrypt/SHA-256
+│   ├── middleware.py              # logging + metrics + POST auth gate
+│   └── routers/reports.py         # R1~R9 보고서 엔드포인트
+├── pipeline/
+│   ├── phase_gate_pipeline.py
+│   ├── funding_matcher.py
+│   └── connectors/                # KIPRIS·GooglePatents·Market·Clinical 등
+├── tests/
+│   ├── conftest.py                # TestClient + auth_token fixture
+│   ├── test_api.py                # 148개 통합 테스트
+│   ├── test_auth.py               # 15개 인증 단위 테스트
+│   └── test_connectors.py         # 53개 커넥터/에이전트/납품물 테스트
+└── requirements.txt
 ```
 
 ## 핵심 프로세스 (G0~G10)
-| 단계 | 이름 | 글로벌 기준 | 핵심 산출물 |
-|------|------|------------|------------|
-| G0 | 기술후보 발굴 | WIPO Lab-to-Market | 기술 후보 등록카드 |
-| G1 | IP 구조화 | Stanford/MIT TLO | IP 구조분석서, FTO |
-| G2 | TRL 평가 | NASA TRL 1~9 | TRL 평가표 |
-| G3 | 시장성 평가 | EIC Transition | 시장성 분석보고서 |
-| G4 | 고객검증 | NSF I-Corps | Customer Discovery Report |
-| G5 | BM 설계 | BMC + Lean Startup | 사업모델 캔버스, GTM |
-| G6 | 가치평가 | DCF·로열티·Real Option | 기술가치평가서 |
-| G7 | PoC·실증 | Catapult·Fraunhofer | PoC 결과보고서 |
-| G8 | MRL·ARL | DoD MRL + DOE ARL | 3중 성숙도 평가표 |
-| G9 | 거래·투자 | TLO 라이선싱·SBIR | 라이선싱·투자 전략서 |
-| G10 | 성과환류 | Horizon Europe | KPI Dashboard |
 
-## Gate 판단 기준
-- **Go**: 다음 단계 진행
-- **Hold**: 추가 데이터/보완 필요
-- **Kill**: 사업화 중단 또는 재설계
+| 단계 | 이름 | 핵심 산출물 |
+|------|------|------------|
+| G0 | 기술후보 발굴 | 기술 후보 등록카드 |
+| G1 | IP 구조화 + G1.6-SCR | IP 구조분석서, FTO, SCR 보고서 |
+| G1.5 | PCML v2.0 | 6계층 청구항 구조 JSON + KPI |
+| G2 | TRL 평가 | TRL 평가표 |
+| G3 | 시장성 평가 | 시장성 분석보고서 |
+| G4 | 고객검증 + LoI 자동생성 | Customer Discovery + 도입의향서 |
+| G5 | BM 설계 + G5-CR + SMK | BM 캔버스 + 사업화 로드맵 + SMK |
+| G6 | 가치평가 | 기술가치평가서 (DCF·로열티·Real Option) |
+| G7 | PoC·실증 | PoC 결과보고서 |
+| G8 | MRL·ARL | 3중 성숙도 평가표 |
+| G9 | 거래·투자 | 라이선싱·투자 전략서 |
+| G10 | 성과환류 | KPI Dashboard |
 
-## 서버 실행
-```bash
-cd C:\IPinsight_a
-python -m uvicorn api.main:app --port 8100 --reload
-```
+## 핵심 결정 로그
+
+| 결정 | 내용 |
+|------|------|
+| G6 주법 | TRL<7 → 로열티구제법, TRL≥7 → DCF |
+| G4 | JTBD 3차원 + NSF I-Corps 100건 기준 |
+| G8 ARL | 5차원, 병목원칙: 단일차원≤2→전체최대4 |
+| G10 BCG | X축 = IP강도35%+특허수명25%+TRL20%+ARL20% |
+| Monte Carlo | TRL낮을수록 rev_std 커짐 (trl_factor=(9-trl)/9) |
+| PCML | 6계층 L1~L6, relation_type 13개, element_class 3종 |
+| 인증 | JWT+APIKey, bcrypt==4.0.1 핀, SHA-256 고정솔트 폴백 |
+| G5-CR | KIAT/KEIT 협약 표준 + DOE Commercialization Plan 구조 |
+| G4 LoI | loi_count≥1 or poc_requests≥1 시 도입의향서 자동생성 |
+| SMK | G5 Go 게이트 시 G3+G4+G5 통합 SMK 자동생성 |
+
+## 코딩 규칙 (절대 준수)
+
+- 모든 에이전트 메서드: `.assess(input_data: dict)` (`.run()` 아님)
+- `CodeLinkerPipeline.run()` — 클래스·메서드 이름 정확히
+- `release_status`: releasable | **internal_only** | blocked (**partial 아님**)
+- PowerShell: `&&` 없음, `$env:PYTHONIOENCODING="utf-8"` 필수
+- pytest: 반드시 `cd C:\IPinsight` 에서 실행 (smart_farm pytest.ini 간섭 방지)
