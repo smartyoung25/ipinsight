@@ -1,8 +1,8 @@
-"""IPInsight — 글로벌 기술사업화 Agent OS (UX v2.0)
+"""IPInsight — 글로벌 기술사업화 Agent OS (UX v2.1)
 실행: streamlit run frontend/app.py
 """
 from __future__ import annotations
-import os, time, json
+import os, time, json, re
 import requests
 import streamlit as st
 
@@ -33,12 +33,141 @@ st.set_page_config(
     page_title="IPInsight — 기술사업화 OS",
     page_icon="🔬",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 # ── CSS 커스텀 ────────────────────────────────────────────────────
 st.markdown("""
 <style>
+/* ── 전역 레이아웃 ── */
+[data-testid="stSidebar"] { display: none !important; }
+[data-testid="collapsedControl"] { display: none !important; }
+.block-container { padding: 0 !important; max-width: 100% !important; }
+
+/* ── 랜딩 레이아웃 ── */
+.landing-wrap {
+  display: flex; height: 100vh; overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* 좌측 패널 */
+.left-panel {
+  width: 260px; min-width: 260px; background: #171717;
+  border-right: 1px solid #2a2a2a; display: flex;
+  flex-direction: column; padding: 0; overflow: hidden;
+}
+.lp-header {
+  padding: 18px 16px 10px;
+  display: flex; align-items: center; gap: 10px;
+}
+.lp-logo { font-size: 20px; }
+.lp-brand { font-size: 15px; font-weight: 700; color: #f0f0f0; }
+.lp-sub { font-size: 10px; color: #666; margin-top: 1px; }
+.lp-new-btn {
+  margin: 8px 12px 4px;
+  background: #2563eb; color: #fff; border: none;
+  border-radius: 8px; padding: 9px 14px; font-size: 13px;
+  font-weight: 600; cursor: pointer; display: flex; align-items: center;
+  gap: 6px; width: calc(100% - 24px);
+  transition: background .15s;
+}
+.lp-new-btn:hover { background: #1d4ed8; }
+.lp-section-title {
+  font-size: 10px; font-weight: 700; color: #555;
+  text-transform: uppercase; letter-spacing: .08em;
+  padding: 14px 16px 4px;
+}
+.lp-item {
+  padding: 8px 16px; font-size: 12px; color: #aaa; cursor: pointer;
+  border-radius: 6px; margin: 1px 8px; display: flex;
+  align-items: center; gap: 8px; transition: background .1s;
+}
+.lp-item:hover { background: #242424; color: #e0e0e0; }
+.lp-item-icon { font-size: 13px; opacity: .7; }
+.lp-item-label { flex:1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lp-item-badge {
+  background: #2a2a2a; color: #666; font-size: 9px;
+  padding: 2px 6px; border-radius: 4px;
+}
+.lp-divider { border:none; border-top: 1px solid #2a2a2a; margin: 8px 0; }
+.lp-bottom {
+  padding: 12px; margin-top: auto;
+  border-top: 1px solid #2a2a2a;
+}
+.lp-api-status {
+  font-size: 10px; color: #555; display: flex; align-items: center; gap: 6px;
+}
+
+/* 우측 메인 */
+.right-panel {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: #1a1a1a; overflow-y: auto; padding: 40px 20px;
+}
+.greeting-area { text-align: center; max-width: 700px; width: 100%; }
+.greeting-title {
+  font-size: 32px; font-weight: 700; color: #f0f0f0;
+  margin-bottom: 6px; line-height: 1.3;
+}
+.greeting-sub {
+  font-size: 14px; color: #777; margin-bottom: 36px;
+}
+/* 입력 박스 */
+.input-box-wrap {
+  background: #242424; border: 1px solid #333; border-radius: 14px;
+  padding: 16px 20px 10px; max-width: 700px; width: 100%;
+  margin: 0 auto 20px;
+}
+.input-box-wrap:focus-within {
+  border-color: #2563eb; box-shadow: 0 0 0 2px #2563eb22;
+}
+/* 파일 드롭 힌트 */
+.drop-hint {
+  font-size: 11px; color: #555; text-align: center;
+  margin: 6px 0 4px; display: flex; align-items: center;
+  justify-content: center; gap: 4px;
+}
+/* 예시 칩 */
+.chips-row {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  justify-content: center; max-width: 700px;
+  margin: 0 auto 32px;
+}
+.chip {
+  background: #242424; border: 1px solid #333; border-radius: 20px;
+  padding: 6px 14px; font-size: 12px; color: #aaa; cursor: pointer;
+  transition: all .15s; display: flex; align-items: center; gap: 5px;
+}
+.chip:hover { background: #2a2a2a; border-color: #2563eb; color: #60a5fa; }
+/* 입력 타입 탭 */
+.type-tabs {
+  display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap;
+}
+.type-tab {
+  background: #1e1e1e; border: 1px solid #333; border-radius: 6px;
+  padding: 5px 12px; font-size: 11px; color: #888; cursor: pointer;
+  transition: all .15s;
+}
+.type-tab.active, .type-tab:hover {
+  background: #1e3a5f; border-color: #2563eb; color: #60a5fa;
+}
+/* 최근 기술 카드 */
+.recent-cards {
+  display: flex; gap: 12px; flex-wrap: wrap;
+  justify-content: center; max-width: 700px; margin: 0 auto;
+}
+.r-card {
+  background: #242424; border: 1px solid #333; border-radius: 10px;
+  padding: 14px 16px; width: 180px; cursor: pointer; transition: all .15s;
+}
+.r-card:hover { border-color: #2563eb; background: #1e2a3a; }
+.r-card-icon { font-size: 20px; margin-bottom: 6px; }
+.r-card-title { font-size: 12px; font-weight: 600; color: #d0d0d0; margin-bottom: 3px; }
+.r-card-sub { font-size: 10px; color: #666; }
+
+/* ── 이후 페이지용 (inner-app) ── */
+.inner-app [data-testid="stSidebar"] { display: flex !important; }
+
 /* G-Stage 진행 표시줄 */
 .stage-bar { display:flex; gap:4px; padding:10px 0 14px; overflow-x:auto; }
 .stage-node { display:flex; flex-direction:column; align-items:center;
@@ -74,13 +203,18 @@ st.markdown("""
 
 # ── 세션 초기화 ──────────────────────────────────────────────────
 _DEFAULTS = {
-    "token": "", "page": "workspace",
-    "tech_id": "DEMO-001", "tech_name": "스마트팜 수확량 예측 AI",
-    "trl": 4, "ipc": "A01G,G06N", "sector": "AgTech",
-    "stage_gates": {},       # {stage_num: {"gate": ..., "score": ...}}
+    "token": "", "page": "home",
+    "tech_id": "", "tech_name": "",
+    "trl": 4, "ipc": "", "sector": "",
+    "stage_gates": {},
     "last_result": None, "last_stage": None,
-    "g4_data": {},           # G4 결과 캐시 (auto pre-fill G5)
-    "g5_data": {},           # G5 결과 캐시
+    "g4_data": {}, "g5_data": {},
+    "recent_techs": [           # 최근 분석 기술 목록
+        {"id": "DEMO-001", "name": "스마트팜 수확량 예측 AI",  "trl": 4, "icon": "🌱"},
+        {"id": "DEMO-002", "name": "차세대 리튬-황 배터리",     "trl": 6, "icon": "⚡"},
+        {"id": "DEMO-003", "name": "AI 기반 암 진단 플랫폼",   "trl": 5, "icon": "🔬"},
+    ],
+    "input_mode": "text",       # text | patent_no | paper | bizplan | file
 }
 for k, v in _DEFAULTS.items():
     if k not in st.session_state:
@@ -188,63 +322,355 @@ def _save_gate(stage_num: int, result: dict):
     st.session_state.last_stage  = stage_num
 
 
-# ── 사이드바 ──────────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("## 🔬 IPInsight")
-    st.caption("글로벌 기술사업화 Agent OS")
-
-    # 전역 기술 컨텍스트 (1회 입력)
-    st.markdown("**📌 현재 기술**")
-    new_id   = st.text_input("기술 ID",  value=st.session_state.tech_id,   key="sb_tid",   label_visibility="collapsed")
-    new_name = st.text_input("기술명",   value=st.session_state.tech_name, key="sb_tname", label_visibility="collapsed",
-                              placeholder="기술명")
-    new_trl  = st.select_slider("TRL", options=list(range(1, 10)),
-                                 value=st.session_state.trl, key="sb_trl")
-    if new_id != st.session_state.tech_id or new_name != st.session_state.tech_name or new_trl != st.session_state.trl:
-        st.session_state.tech_id   = new_id
-        st.session_state.tech_name = new_name
-        st.session_state.trl       = new_trl
-
-    st.divider()
-
-    # 역할 기반 메뉴 (3그룹)
-    st.markdown("**발굴·평가**")
-    if st.button("🏠 워크스페이스",    use_container_width=True): st.session_state.page = "workspace"
-    if st.button("📡 IP 분석 허브",   use_container_width=True): st.session_state.page = "ip_hub"
-    if st.button("🗺️ 전체 로드맵",     use_container_width=True): st.session_state.page = "roadmap"
-
-    st.markdown("**사업화 실행**")
-    if st.button("🤝 G4 인터뷰 보드", use_container_width=True): st.session_state.page = "interviews"
-    if st.button("💼 G5 BM 캔버스",   use_container_width=True): st.session_state.page = "bm"
-    if st.button("💰 G6 가치평가",    use_container_width=True): st.session_state.page = "valuation"
-
-    st.markdown("**모니터링·관리**")
-    if st.button("📈 G10 KPI 대시보드", use_container_width=True): st.session_state.page = "kpi"
-    if st.button("📄 보고서 센터",      use_container_width=True): st.session_state.page = "reports"
-    if st.button("⚙️ 관리자 콘솔",      use_container_width=True): st.session_state.page = "admin"
-
-    st.divider()
+# ── 홈 화면 이외에서는 상단 네비 바 렌더링 ───────────────────────
+def render_topnav():
+    """홈 이외 페이지에서 상단 고정 네비게이션"""
     health = api_get("/health", silent=True)
-    if health:
-        st.caption(f"✅ API v{health.get('version','?')}")
-        groq = health.get("groq", False)
-        st.caption(f"{'🟢' if groq else '🟡'} Groq LLM {'활성' if groq else '미설정'}")
-    else:
-        st.caption("🔴 API 연결 실패")
+    api_ok = health is not None
+    tid  = st.session_state.tech_id  or "–"
+    name = st.session_state.tech_name or "기술 미선택"
+    cols = st.columns([1, 4, 1])
+    with cols[0]:
+        if st.button("⬅ 홈", key="nav_home"):
+            st.session_state.page = "home"; st.rerun()
+    with cols[1]:
+        st.markdown(
+            f"<div style='font-size:12px;color:#94a3b8;padding:6px 0'>"
+            f"🔬 <b style='color:#e2e8f0'>{name}</b>"
+            f" &nbsp;·&nbsp; <code>{tid}</code>"
+            f" &nbsp;·&nbsp; TRL {st.session_state.trl}</div>",
+            unsafe_allow_html=True,
+        )
+    with cols[2]:
+        st.caption(f"{'✅ API' if api_ok else '🔴 API 오프라인'}")
+    st.divider()
 
-    if st.session_state.token:
-        if st.button("로그아웃", use_container_width=True):
-            st.session_state.token = ""
+def render_sidenav():
+    """홈 이외 페이지 왼쪽 네비게이션 (st.sidebar 대신 컬럼 사용)"""
+    nav_items = [
+        ("🏠", "워크스페이스",    "workspace"),
+        ("📡", "IP 분석 허브",    "ip_hub"),
+        ("🗺️", "전체 로드맵",     "roadmap"),
+        None,
+        ("🤝", "G4 인터뷰 보드", "interviews"),
+        ("💼", "G5 BM 캔버스",   "bm"),
+        ("💰", "G6 가치평가",    "valuation"),
+        None,
+        ("📈", "G10 KPI",        "kpi"),
+        ("📄", "보고서 센터",     "reports"),
+        ("⚙️", "관리자 콘솔",     "admin"),
+    ]
+    st.markdown("**IPInsight**")
+    st.caption("기술사업화 OS")
+    st.divider()
+    for item in nav_items:
+        if item is None:
+            st.markdown("<hr style='margin:6px 0;border-color:#334155'>", unsafe_allow_html=True)
+            continue
+        icon, label, pg = item
+        active = st.session_state.page == pg
+        style = "primary" if active else "secondary"
+        if st.button(f"{icon} {label}", use_container_width=True, key=f"nav_{pg}", type=style):
+            st.session_state.page = pg; st.rerun()
+
+
+# ════════════════════════════════════════════════════════════════
+# HOME — Claude 스타일 랜딩 화면
+# ════════════════════════════════════════════════════════════════
+if st.session_state.page == "home":
+
+    health = api_get("/health", silent=True)
+    api_ok = health is not None
+
+    # ── 좌측 패널 / 우측 패널 컬럼 ──
+    left_col, right_col = st.columns([1, 3], gap="small")
+
+    # ──────────── 좌측 패널 ────────────
+    with left_col:
+        # 브랜드
+        st.markdown(
+            "<div style='padding:8px 0 6px;'>"
+            "<span style='font-size:22px'>🔬</span> "
+            "<span style='font-size:16px;font-weight:700'>IPInsight</span><br>"
+            "<span style='font-size:10px;color:#888'>글로벌 기술사업화 Agent OS</span>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        # 새 분석 버튼
+        if st.button("✏️  새 기술 분석", use_container_width=True, type="primary", key="home_new"):
+            st.session_state.tech_id   = ""
+            st.session_state.tech_name = ""
+            st.session_state.trl       = 4
+            st.session_state.stage_gates = {}
+            st.session_state.page      = "home"
             st.rerun()
-    else:
-        if st.button("🔐 로그인", use_container_width=True):
-            st.session_state.page = "login"
+
+        st.markdown(
+            "<p style='font-size:10px;font-weight:700;color:#555;"
+            "text-transform:uppercase;letter-spacing:.08em;"
+            "padding:14px 4px 4px;margin:0'>프로젝트</p>",
+            unsafe_allow_html=True,
+        )
+
+        # 프로젝트 유형 메뉴
+        project_items = [
+            ("📋", "특허 포트폴리오"),
+            ("🏭", "기술 이전 프로젝트"),
+            ("🚀", "스타트업 사업화"),
+            ("🔬", "R&D 상용화"),
+        ]
+        for icon, label in project_items:
+            st.markdown(
+                f"<div style='padding:7px 6px;font-size:12px;color:#888;"
+                f"display:flex;align-items:center;gap:8px;cursor:pointer;"
+                f"border-radius:6px;margin:1px 0'>"
+                f"<span>{icon}</span><span>{label}</span></div>",
+                unsafe_allow_html=True,
+            )
+
+        st.markdown(
+            "<p style='font-size:10px;font-weight:700;color:#555;"
+            "text-transform:uppercase;letter-spacing:.08em;"
+            "padding:14px 4px 4px;margin:0'>최근 분석</p>",
+            unsafe_allow_html=True,
+        )
+
+        # 최근 기술 목록
+        for tech in st.session_state.recent_techs:
+            btn_label = f"{tech['icon']} {tech['name'][:14]}{'…' if len(tech['name'])>14 else ''}"
+            if st.button(btn_label, use_container_width=True, key=f"recent_{tech['id']}"):
+                st.session_state.tech_id   = tech["id"]
+                st.session_state.tech_name = tech["name"]
+                st.session_state.trl       = tech["trl"]
+                st.session_state.page      = "workspace"
+                st.rerun()
+
+        # 하단 상태
+        st.markdown("<hr style='border-color:#2a2a2a;margin:20px 0 8px'>", unsafe_allow_html=True)
+        api_dot = "🟢" if api_ok else "🔴"
+        st.caption(f"{api_dot} API {'연결됨' if api_ok else '오프라인'}")
+        if st.session_state.token:
+            if st.button("로그아웃", use_container_width=True, key="logout_home"):
+                st.session_state.token = ""; st.rerun()
+        else:
+            if st.button("🔐 로그인", use_container_width=True, key="login_home"):
+                st.session_state.page = "admin"; st.rerun()
+
+    # ──────────── 우측 패널 ────────────
+    with right_col:
+        # 상단 여백
+        st.markdown("<div style='height:60px'></div>", unsafe_allow_html=True)
+
+        # 인사말
+        st.markdown(
+            "<div style='text-align:center;margin-bottom:32px'>"
+            "<div style='font-size:36px;font-weight:700;color:#f0f0f0;line-height:1.3'>"
+            "기술의 가치를 발견하세요</div>"
+            "<div style='font-size:14px;color:#666;margin-top:8px'>"
+            "특허·논문·사업계획서·기술명 — 무엇이든 입력하면 G0→G10 사업화 분석이 시작됩니다</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        # ── 입력 모드 탭 ──
+        mode_labels = {
+            "text":      ("✏️",  "직접 입력"),
+            "patent_no": ("📄",  "특허번호"),
+            "paper":     ("🎓",  "논문 정보"),
+            "bizplan":   ("📊",  "사업계획서"),
+            "file":      ("📎",  "파일 업로드"),
+        }
+        tab_cols = st.columns(len(mode_labels))
+        for i, (mode_key, (icon, label)) in enumerate(mode_labels.items()):
+            is_active = st.session_state.input_mode == mode_key
+            btn_type  = "primary" if is_active else "secondary"
+            with tab_cols[i]:
+                if st.button(f"{icon} {label}", use_container_width=True,
+                             type=btn_type, key=f"mode_{mode_key}"):
+                    st.session_state.input_mode = mode_key
+                    st.rerun()
+
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+        mode = st.session_state.input_mode
+
+        # ── 모드별 입력 폼 ──
+        with st.form("landing_form", clear_on_submit=False):
+
+            if mode == "text":
+                user_input = st.text_area(
+                    "기술 설명",
+                    placeholder=(
+                        "기술명, 특허 청구항, 기술 요약 등을 자유롭게 입력하세요.\n\n"
+                        "예시:\n"
+                        "• 청구항 1: 딥러닝 기반 작물 수확량 예측 방법으로서...\n"
+                        "• 본 발명은 IoT 센서와 머신러닝을 결합하여..."
+                    ),
+                    height=160, label_visibility="collapsed",
+                )
+                tech_id_input   = st.text_input("기술 ID (선택)", placeholder="예: KR-2024-AI-001", value="")
+                tech_name_input = st.text_input("기술명 (선택)", placeholder="예: 스마트팜 수확량 예측 AI", value="")
+                patent_no_input = ""
+                paper_title     = ""; paper_doi = ""; paper_abstract = ""
+                biz_summary     = ""; biz_target = ""
+                uploaded_file   = None
+
+            elif mode == "patent_no":
+                st.markdown("##### 특허번호로 분석")
+                patent_no_input = st.text_input(
+                    "특허번호",
+                    placeholder="KR10-2023-0001234  /  US11234567  /  EP3456789",
+                    label_visibility="collapsed",
+                )
+                c1, c2 = st.columns(2)
+                tech_id_input   = c1.text_input("기술 ID", placeholder="자동 생성됨", value="")
+                tech_name_input = c2.text_input("기술명 (선택)", placeholder="특허 제목에서 자동 추출", value="")
+                user_input = patent_no_input
+                paper_title = ""; paper_doi = ""; paper_abstract = ""
+                biz_summary = ""; biz_target = ""
+                uploaded_file = None
+
+            elif mode == "paper":
+                st.markdown("##### 논문 정보 입력")
+                c1, c2 = st.columns(2)
+                paper_title    = c1.text_input("논문 제목", placeholder="예: Deep Learning for Crop Yield Prediction")
+                paper_doi      = c2.text_input("DOI / arXiv", placeholder="10.1000/xyz123  또는  arXiv:2301.00000")
+                paper_abstract = st.text_area("초록 (Abstract)", height=120,
+                                              placeholder="논문 초록을 붙여넣으세요...")
+                tech_name_input = st.text_input("파생 기술명 (선택)", placeholder="논문에서 파생될 기술명")
+                user_input      = f"{paper_title}\n{paper_doi}\n{paper_abstract}"
+                tech_id_input   = ""; patent_no_input = ""
+                biz_summary = ""; biz_target = ""
+                uploaded_file = None
+
+            elif mode == "bizplan":
+                st.markdown("##### 사업계획서 정보 입력")
+                biz_summary = st.text_area(
+                    "기술/사업 요약",
+                    height=130,
+                    placeholder=(
+                        "사업계획서의 핵심 내용을 입력하세요.\n"
+                        "• 개발 기술 개요\n• 목표 시장 및 고객\n• 수익 모델\n• 기대 효과"
+                    ),
+                )
+                c1, c2 = st.columns(2)
+                biz_target      = c1.text_input("목표 시장", placeholder="예: 국내 온실 농가 2만 호")
+                tech_name_input = c2.text_input("기술명", placeholder="예: AI 작물 관리 SaaS")
+                user_input      = f"{biz_summary}\n목표시장: {biz_target}"
+                tech_id_input   = ""; patent_no_input = ""
+                paper_title = ""; paper_doi = ""; paper_abstract = ""
+                uploaded_file = None
+
+            else:  # file
+                st.markdown("##### 파일 업로드")
+                uploaded_file = st.file_uploader(
+                    "파일 선택",
+                    type=["pdf", "txt", "docx", "hwp", "xlsx", "png", "jpg"],
+                    label_visibility="collapsed",
+                    help="특허명세서 PDF, 사업계획서 DOCX, 논문 PDF, 기술개요 TXT 등",
+                )
+                tech_name_input = st.text_input("기술명 (선택)", placeholder="파일에서 자동 추출 시도")
+                user_input      = uploaded_file.name if uploaded_file else ""
+                tech_id_input   = ""; patent_no_input = ""
+                paper_title = ""; paper_doi = ""; paper_abstract = ""
+                biz_summary = ""; biz_target = ""
+
+            st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+
+            # TRL 슬라이더
+            trl_val = st.select_slider(
+                "현재 TRL 단계",
+                options=list(range(1, 10)),
+                value=4,
+                format_func=lambda x: {
+                    1:"TRL1 기초연구",2:"TRL2 개념정립",3:"TRL3 개념검증",
+                    4:"TRL4 실험실검증",5:"TRL5 파일럿",6:"TRL6 시제품",
+                    7:"TRL7 시스템검증",8:"TRL8 인증",9:"TRL9 상용화",
+                }[x],
+            )
+
+            # 제출
+            submitted = st.form_submit_button(
+                "🚀  분석 시작",
+                use_container_width=True,
+                type="primary",
+            )
+
+        if submitted and (user_input or uploaded_file):
+            # 기술 ID 자동 생성
+            import time as _time
+            auto_id = tech_id_input.strip() or f"TECH-{int(_time.time()) % 100000}"
+            auto_name = tech_name_input.strip() or (
+                patent_no_input.strip() or
+                paper_title[:30] or
+                biz_target[:30] or
+                user_input[:30].replace("\n", " ") or
+                "분석 기술"
+            )
+
+            st.session_state.tech_id   = auto_id
+            st.session_state.tech_name = auto_name
+            st.session_state.trl       = trl_val
+            st.session_state.ipc       = ""
+            st.session_state.stage_gates = {}
+
+            # 최근 분석 목록에 추가
+            new_recent = {"id": auto_id, "name": auto_name, "trl": trl_val, "icon": "🔬"}
+            recs = [r for r in st.session_state.recent_techs if r["id"] != auto_id]
+            st.session_state.recent_techs = [new_recent] + recs[:4]
+
+            # 입력 유형에 따라 첫 분석 화면으로 이동
+            if mode in ("patent_no", "text") and (patent_no_input or user_input):
+                st.session_state.page = "ip_hub"
+            elif mode == "paper":
+                st.session_state.page = "ip_hub"
+            elif mode == "bizplan":
+                st.session_state.page = "bm"
+            else:
+                st.session_state.page = "workspace"
+            st.rerun()
+
+        elif submitted:
+            st.warning("입력값을 먼저 작성해 주세요.")
+
+        # ── 예시 칩 ──
+        st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div style='text-align:center;font-size:11px;color:#555;margin-bottom:10px'>"
+            "빠른 시작 예시</div>",
+            unsafe_allow_html=True,
+        )
+        chip_data = [
+            ("📄", "KR10-2021-0112233", "patent_no"),
+            ("🌱", "스마트팜 수확량 AI", "text"),
+            ("⚡", "차세대 배터리 양극재", "text"),
+            ("🧬", "mRNA 백신 전달체", "text"),
+            ("🤖", "US10123456 (robotics)", "patent_no"),
+            ("🎓", "IEEE 논문 기술이전", "paper"),
+        ]
+        chip_cols = st.columns(3)
+        for i, (icon, label, chip_mode) in enumerate(chip_data):
+            with chip_cols[i % 3]:
+                if st.button(f"{icon} {label}", use_container_width=True,
+                             key=f"chip_{i}"):
+                    st.session_state.input_mode = chip_mode
+                    st.session_state.tech_name  = label
+                    st.session_state.tech_id    = f"DEMO-{i+10}"
+                    st.session_state.trl        = 4
+                    st.session_state.stage_gates = {}
+                    new_r = {"id": f"DEMO-{i+10}", "name": label, "trl": 4, "icon": icon}
+                    recs2 = [r for r in st.session_state.recent_techs if r["id"] != f"DEMO-{i+10}"]
+                    st.session_state.recent_techs = [new_r] + recs2[:4]
+                    st.session_state.page = "workspace"
+                    st.rerun()
 
 
 # ════════════════════════════════════════════════════════════════
 # S01 — 기술 워크스페이스 (메인 허브)
 # ════════════════════════════════════════════════════════════════
-if st.session_state.page == "workspace":
+elif st.session_state.page == "workspace":
+    render_topnav()
     render_context_banner()
     st.title("🏠 기술 워크스페이스")
     render_stage_bar()
@@ -315,6 +741,7 @@ if st.session_state.page == "workspace":
 # S03 — IP 분석 허브 (PCML + SCR 체인 통합)
 # ════════════════════════════════════════════════════════════════
 elif st.session_state.page == "ip_hub":
+    render_topnav()
     render_context_banner()
     st.title("📡 IP 분석 허브")
     render_stage_bar(current=1)
@@ -418,6 +845,7 @@ elif st.session_state.page == "ip_hub":
 # S04 — G4 인터뷰 보드 (칸반 + JTBD + LoI)
 # ════════════════════════════════════════════════════════════════
 elif st.session_state.page == "interviews":
+    render_topnav()
     render_context_banner()
     st.title("🤝 G4 고객검증 — NSF I-Corps 인터뷰 보드")
     render_stage_bar(current=4)
@@ -560,6 +988,7 @@ elif st.session_state.page == "interviews":
 # S05 — G5 BM 캔버스 (9블록 + Unit Economics + 로드맵)
 # ════════════════════════════════════════════════════════════════
 elif st.session_state.page == "bm":
+    render_topnav()
     render_context_banner()
     st.title("💼 G5 BM 캔버스")
     render_stage_bar(current=5)
@@ -710,6 +1139,7 @@ elif st.session_state.page == "bm":
 # G6 가치평가
 # ════════════════════════════════════════════════════════════════
 elif st.session_state.page == "valuation":
+    render_topnav()
     render_context_banner()
     st.title("💰 G6 기술 가치평가")
     render_stage_bar(current=6)
@@ -750,6 +1180,7 @@ elif st.session_state.page == "valuation":
 # G10 KPI 대시보드
 # ════════════════════════════════════════════════════════════════
 elif st.session_state.page == "kpi":
+    render_topnav()
     render_context_banner()
     st.title("📈 G10 성과 모니터링")
     render_stage_bar(current=10)
@@ -844,6 +1275,7 @@ elif st.session_state.page == "kpi":
 # 보고서 센터 (R1~R9)
 # ════════════════════════════════════════════════════════════════
 elif st.session_state.page == "reports":
+    render_topnav()
     render_context_banner()
     st.title("📄 보고서 센터 — R1~R9")
     render_stage_bar()
@@ -894,6 +1326,7 @@ elif st.session_state.page == "reports":
 # 전체 로드맵
 # ════════════════════════════════════════════════════════════════
 elif st.session_state.page == "roadmap":
+    render_topnav()
     render_context_banner()
     st.title("🗺️ G0→G10 전체 로드맵")
     render_stage_bar()
@@ -947,6 +1380,7 @@ elif st.session_state.page == "roadmap":
 # 관리자 콘솔 (통합)
 # ════════════════════════════════════════════════════════════════
 elif st.session_state.page == "admin":
+    render_topnav()
     st.title("⚙️ 관리자 콘솔")
 
     tab_health, tab_metrics, tab_jobs, tab_login = st.tabs(
