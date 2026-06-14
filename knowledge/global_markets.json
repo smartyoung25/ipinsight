@@ -1,7 +1,7 @@
 {
-  "description": "30개국+ 시장환경·IP강도·규제 기초 데이터 — KR·US·EU·개발도상국 전면 커버 (2026-06)",
+  "description": "35개국+ 시장환경·IP강도·규제 기초 데이터 — KR·US·EU·JP·CN·IN·RU·개발도상국 전면 커버 (2026-06)",
   "last_updated": "2026-06",
-  "regions": ["북미", "유럽", "동아시아", "동남아시아", "남아시아", "중동·북아프리카", "사하라이남아프리카", "중남미"],
+  "regions": ["북미", "유럽", "동아시아", "동남아시아", "남아시아", "중동·북아프리카", "사하라이남아프리카", "중남미", "독립국가연합"],
   "countries": [
     {
       "code": "KOR",
@@ -188,51 +188,74 @@
       "iso2": "JP",
       "name": "일본",
       "region": "동아시아",
+      "region_code": "JP",
       "gdp_usd_bn": 4213,
+      "gdp_growth_pct": 1.5,
+      "population_mn": 125,
       "ip_environment": {
         "ip_score": 80,
-        "patent_system": "선출원주의 (특허청 JPO)",
-        "patent_office": "JPO",
-        "enforcement": "강함",
+        "patent_system": "선출원주의 (특허법 기반, 1985년 개정)",
+        "patent_office": "JPO (特許庁)",
+        "enforcement": "강함 — 특허침해 징벌적 손해배상 도입(2021)",
         "avg_grant_months": 14,
         "annual_filing_count": 290000,
-        "utility_model": true
+        "utility_model": true,
+        "key_treaties": ["PCT", "Paris Convention", "Hague System"],
+        "special_risks": "대기업 크로스라이선스 네트워크 — 진입 전 FTO 분석 필수"
       },
       "market_attractiveness": {
         "tier": 1,
-        "vc_ecosystem": "중간 (도쿄·오사카)",
-        "tech_sectors": ["로봇", "자동차", "반도체 소재", "AgriTech", "의료기기"],
-        "gov_rd_pct_gdp": 3.3
+        "vc_ecosystem": "중간 (도쿄·오사카) — Seed 부족, 後期 풍부",
+        "tech_sectors": ["로봇·자동화", "자동차(EV 전환)", "반도체 소재", "AgriTech(스마트팜)", "의료기기·재생의료"],
+        "gov_rd_pct_gdp": 3.3,
+        "unicorns": 10,
+        "key_megatrends": ["少子高齢化(저출산·고령화)", "食料自給率(식량자급률 향상)", "GX(그린전환)", "DX(디지털전환)"]
       },
-      "regulatory_burden": "높음 — MHLW(의료)·MAFF(농업)·MIC(정보)",
-      "key_programs": ["JST (과학기술진흥기구)", "NEDO (에너지산업개발기구)", "STS 창업지원"],
-      "market_entry_note": "현지 대기업 파트너십(파나소닉·후지쯔·NTT) 필수, 단독 진입 어려움",
-      "oda_role": "공여국 — JICA 개도국 스마트농업 지원"
+      "regulatory_burden": "높음 — PMD Act(의약품의료기기법)·MAFF(농업)·APPI(개인정보)",
+      "key_programs": ["JST ACT-X·CREST", "NEDO 그린이노베이션 기금(2조엔)", "J-Startup Global", "経済安保法(경제안보 기술지원)"],
+      "market_entry_note": "넴아와시(根回し) 사전 합의 문화. 종합상사(三菱商事·伊藤忠) 통한 유통 진입이 가장 효과적",
+      "oda_role": "공여국 — JICA 개도국 스마트농업·인프라 ODA, JCM(공동크레딧메커니즘) 25개국",
+      "carbon_market": "J-Credit + 비자발적 탄소시장, GX트랜지션 채권(10년 20조엔)",
+      "geopolitical_note": "Quad(미·일·호·인도) + AUKUS 파트너, 중국 디커플링 가속"
     },
     {
       "code": "CHN",
       "iso2": "CN",
       "name": "중국",
       "region": "동아시아",
+      "region_code": "CN",
       "gdp_usd_bn": 17795,
+      "gdp_growth_pct": 5.0,
+      "population_mn": 1412,
       "ip_environment": {
         "ip_score": 55,
-        "patent_system": "선출원주의 (CNIPA)",
-        "patent_office": "CNIPA",
-        "enforcement": "개선 중 (IP 법원 신설), 실용신안 남용 주의",
+        "patent_system": "선출원주의 (CNIPA, 특허법 2021년 4차 개정 — 징벌적 손해배상 10배)",
+        "patent_office": "CNIPA (国家知識産権局)",
+        "enforcement": "개선 중 — IP 전문법원(베이징·상하이·광저우), 실용신안 남용 주의",
         "avg_grant_months": 22,
         "annual_filing_count": 1600000,
-        "utility_model": true
+        "utility_model": true,
+        "key_treaties": ["PCT", "Paris Convention", "TRIPS", "Madrid Protocol"],
+        "special_risks": [
+          "기술수출입관리조례: 특정 기술 역외 이전 → 정부 사전 승인",
+          "데이터 현지화(PIPL·DSL·CSL): 알고리즘·AI 모델 역외 이전 제한",
+          "합작법인(JV) 내 기술 유출 리스크 — 계약 보호 필수"
+        ]
       },
       "market_attractiveness": {
         "tier": 1,
-        "vc_ecosystem": "매우 발달 (베이징·상하이·선전)",
-        "tech_sectors": ["AI", "전기차", "드론 AgriTech", "바이오", "재생에너지"],
-        "gov_rd_pct_gdp": 2.5
+        "vc_ecosystem": "매우 발달 (베이징·상하이·선전·항저우)",
+        "tech_sectors": ["AI(바이두·알리·화웨이)", "전기차(BYD·NIO)", "드론 AgriTech", "바이오", "재생에너지(세계 1위)"],
+        "gov_rd_pct_gdp": 2.5,
+        "unicorns": 340,
+        "key_megatrends": ["쌍순환(내수+수출)", "技術자립(반도체·AI 국산화)", "农業数字化(농업디지털화)", "双碳(2060탄소중립)"]
       },
-      "regulatory_burden": "매우 높음 — SAMR·CAMA·데이터현지화법(MLPS)",
-      "market_entry_note": "합작법인(JV) 또는 현지 파트너 필수. 기술 유출 리스크 관리 필수",
-      "caution": "지재권 분쟁, 기술 강제 이전, 데이터 국경 리스크"
+      "regulatory_burden": "매우 높음 — SAMR·NMPA·데이터3법·AI관리규정·생성형AI관리규정(2023)",
+      "key_programs": ["Torch Program(153개 HIDZ)", "科创板(STAR Market)", "国家集成電路産業基金(빅펀드 2기)", "专项资金(AI·반도체 전략지원)"],
+      "market_entry_note": "WFOE(외자독자법인) vs JV(합작법인) vs VIE 선택. 상하이·선전 FTZ 우선 진입 후 전국 확산",
+      "caution": "기술 강제이전·데이터 현지화·VIE 구조 불확실성·US-CN 디커플링",
+      "carbon_market": "전국 ETS (2021~) 발전업 우선, 60~80위안/톤. CCER(자발적) 병행",
+      "geopolitical_note": "US-CN 기술전쟁(반도체·AI)·대만 리스크·BRI(일대일로) 개도국 진출 레버리지"
     },
     {
       "code": "SGP",
@@ -398,30 +421,43 @@
       "iso2": "IN",
       "name": "인도",
       "region": "남아시아",
+      "region_code": "IN",
       "gdp_usd_bn": 3500,
       "gdp_growth_pct": 7.0,
       "population_mn": 1430,
       "ip_environment": {
         "ip_score": 42,
-        "patent_system": "선출원주의 (CGPDTM)",
-        "patent_office": "CGPDTM (IPO India)",
-        "enforcement": "중간 (개선 중)",
+        "patent_system": "선출원주의 (1970년 특허법 + TRIPS 2005년 개정)",
+        "patent_office": "CGPDTM (IPO India — Controller General of Patents)",
+        "enforcement": "중간 (개선 중 — 특허법원 신설 논의)",
         "avg_grant_months": 48,
         "annual_filing_count": 70000,
         "utility_model": false,
-        "compulsory_license_risk": "있음 (의약품 분야 실적)"
+        "compulsory_license_risk": "있음 — 특허 등록 3년 후 강제실시권 신청 가능 (의약 실적)",
+        "sec3d_risk": "공지 물질 신형태·신용도 특허 불가 (Section 3(d)) — 에버그리닝 방지",
+        "key_treaties": ["PCT", "Paris Convention", "TRIPS"],
+        "pph_available": "미국·일본·한국과 PPH(특허심사 하이웨이) 활용 → 심사 기간 단축"
       },
       "market_attractiveness": {
         "tier": 2,
-        "vc_ecosystem": "발달 (벵갈루루·뭄바이·델리)",
-        "tech_sectors": ["AI/SaaS", "애그리테크", "제약·바이오시밀러", "핀테크", "재생에너지"],
+        "vc_ecosystem": "발달 (벵갈루루·뭄바이·델리 NCR)",
+        "tech_sectors": ["AI/SaaS (IT서비스 수출기지)", "AgriTech (세계 2위 농업국)", "제약·바이오시밀러", "핀테크(UPI·인도스택)", "재생에너지(태양광·풍력)"],
         "unicorns": 110,
-        "middle_class_mn": 300
+        "middle_class_mn": 300,
+        "india_stack": "Aadhaar(생체인식 ID)·UPI(즉시결제)·ONDC(개방형 커머스) — 디지털 인프라 세계 선진"
       },
-      "regulatory_burden": "높음 — CDSCO(의료기기)·FSSAI(식품)·BIS(표준)·DPDP Act(데이터)",
-      "key_programs": ["Startup India", "Make in India", "BIRAC (바이오)", "SIDBI"],
-      "market_entry_note": "Tier-2/3 도시 미서비스 시장 거대. 현지화·저가 모델 필수",
-      "dev_finance": ["World Bank", "ADB", "USAID DIV"]
+      "regulatory_burden": "높음 — CDSCO(의료기기)·FSSAI(식품)·BIS(표준)·DPDP Act(데이터)·PLI(현지생산 필수)",
+      "key_programs": ["Startup India Seed Fund", "Make in India (PLI 14개 분야)", "BIRAC (바이오)","SIDBI FoF", "Atal Innovation Mission"],
+      "market_entry_note": "14억 인구 × 7% 성장. Tier-2/3 도시 미서비스 시장 거대. 현지화·저가 모델 필수. 주별 규제 상이",
+      "tier_strategy": {
+        "tier1": "뭄바이·델리·벵갈루루 — B2B·SaaS·스타트업",
+        "tier2": "푸네·하이데라바드·아흐마다바드 — 제조·AgriTech",
+        "tier3": "농촌 지역 — AgriTech·핀테크 리프로그 기회"
+      },
+      "dev_finance": ["World Bank", "ADB", "USAID DIV"],
+      "geopolitical_note": "Quad(미·일·호·인도) 참여. 미중 경쟁의 제3지점(넥스트 차이나) 포지션",
+      "carbon_market": "BRSR 의무 공시(NSE·BSE 상위 1000사). 탄소시장 미도입(2030 후 예상)",
+      "isr_programs": ["International Solar Alliance (인도 주도, 120개국 참여)"]
     },
     {
       "code": "BGD",
@@ -835,6 +871,65 @@
     }
   ],
 
+    {
+      "code": "RUS",
+      "iso2": "RU",
+      "name": "러시아",
+      "region": "독립국가연합",
+      "region_code": "RU",
+      "gdp_usd_bn": 1862,
+      "gdp_growth_pct": 3.6,
+      "population_mn": 144,
+      "sanction_status": "서방 제재 대상 (2022년 이후 OFAC·EU·UK OFSI 광범위 제재)",
+      "ip_environment": {
+        "ip_score": 40,
+        "patent_system": "선출원주의 (러시아 민법 4편 + 특허법)",
+        "patent_office": "Rospatent (연방지식재산청 — Роспатент)",
+        "enforcement": "중간 — 2022년 이후 '비우호국' 특허 강제 허여 가능 (정부령 № 299)",
+        "avg_grant_months": 18,
+        "annual_filing_count": 35000,
+        "utility_model": true,
+        "key_treaties": ["PCT", "Paris Convention", "Madrid Protocol", "EAPO(유라시아특허기구)"],
+        "eurasian_patent": {
+          "org":      "EAPO (Eurasian Patent Organization)",
+          "members":  ["RU", "BY", "AM", "KZ", "KG", "TJ", "TM", "AZ"],
+          "advantage": "단일 출원으로 8개 유라시아 회원국 동시 보호",
+          "cost_usd":  1500
+        },
+        "special_risks": [
+          "비우호국 특허: 서방 기업 특허를 러시아 기업이 동의 없이 사용 허용 (정부령 № 299/2022)",
+          "소프트웨어: 알고리즘 자체는 특허 불가 — 기술적 효과 입증 시만 허용",
+          "강제실시권: 국방·안보 목적 시 즉시 발동 가능"
+        ]
+      },
+      "market_attractiveness": {
+        "tier": 3,
+        "vc_ecosystem": "매우 위축 (2022년 이후 서방 VC 철수, 현지 자금 의존)",
+        "tech_sectors": ["방산·우주(Rosatom·Roscosmos)", "에너지(Gazprom·Rosneft)", "원자력(로사톰 — 세계 최대 수출)", "농업(밀·보리 세계 최대 수출국)", "사이버보안"],
+        "gov_rd_pct_gdp": 1.1,
+        "unicorns": 3,
+        "key_megatrends": ["수입대체(импортозамещение)", "기술주권", "아시아·중동 피벗", "원자력 수출"]
+      },
+      "regulatory_burden": "높음 — GOST R(국가표준)·Roskomnadzor(데이터)·FSB(암호화)·EAEU 기술규정·제재 대응 특별조치",
+      "eaeu_membership": {
+        "name":    "EAEU (유라시아 경제연합)",
+        "members": ["RU", "BY", "KZ", "AM", "KG"],
+        "benefit": "EAC 마크 1회 인증 → 5개국 동시 판매. GDP 합산 $2.5조"
+      },
+      "key_programs": ["Skolkovo 재단 (세금혜택·보조금·샌드박스)", "ФСИ (혁신지원기금 — 비니크 프로그램)", "RVC (국가 FoF)", "РФРИТ (디지털기술 발전기금)"],
+      "market_entry_note": "⚠️ 서방 기업: 2022년 이후 신규 진출 사실상 불가 (OFAC·EU·UK 제재). 비제재국(UAE·터키·카자흐스탄) 우회 구조만 가능",
+      "exit_options": ["MOEX (모스크바 증권거래소)", "M&A(국내 전략적 투자자)"],
+      "carbon_market": "탄소단위 등록(2021 연방법 № 296-FZ). 탄소세 2025년 이후 도입 논의. CBAM(EU) 타격 예상",
+      "geopolitical_note": "2022년 이후 경제·외교 분리. 중국·인도·MENA와 무역 피벗. BRICS+·SCO 중심 평행 체제 구축",
+      "alternative_access": {
+        "note": "서방 기업의 대러시아 접근 우회 경로",
+        "routes": [
+          "UAE(두바이) 법인 설립 → 러시아 우회 수출",
+          "터키·카자흐스탄 현지 파트너 통한 리셀링",
+          "기술 라이선스: CIPS·루블 직결제로 로열티 수령"
+        ]
+      }
+    },
   "region_summary": {
     "KR": {
       "ip_tier": "강함",
@@ -853,6 +948,38 @@
       "regulatory_tier": "높음",
       "market_tier": 1,
       "dev_aid_role": "공여국 (EFSD+)"
+    },
+    "JP": {
+      "ip_tier": "강함",
+      "regulatory_tier": "높음",
+      "market_tier": 1,
+      "dev_aid_role": "공여국 (JICA·JCM)",
+      "key_risks": "장기 영업주기·언어 장벽·大企業 생태계 진입",
+      "key_opportunity": "스마트팜·로봇·의료기기 高부가 시장"
+    },
+    "CN": {
+      "ip_tier": "중간 (개선 중)",
+      "regulatory_tier": "매우 높음",
+      "market_tier": 1,
+      "dev_aid_role": "수원→공여국 전환 (BRI 개도국 투자)",
+      "key_risks": "기술 유출·데이터 현지화·VIE 불확실·US-CN 디커플링",
+      "key_opportunity": "14억 내수·세계 최대 제조·AgriTech 국가 의제"
+    },
+    "IN": {
+      "ip_tier": "중간",
+      "regulatory_tier": "높음",
+      "market_tier": 2,
+      "dev_aid_role": "수원→공여국 전환",
+      "key_risks": "가격 압박·주별 규제 편차·긴 영업주기",
+      "key_opportunity": "7% 성장·인도 스택·500GW 재생에너지·SaaS 수출기지"
+    },
+    "RU": {
+      "ip_tier": "중간",
+      "regulatory_tier": "높음",
+      "market_tier": 3,
+      "sanction_status": "제재 대상 — 서방 기업 신규 진출 불가",
+      "key_risks": "OFAC·EU·UK 제재·자산 몰수·기술 강제 허여",
+      "key_opportunity": "EAEU 5개국 통합 시장 (비제재 기업 한정)·원자력·농업기술"
     },
     "DEV_SEA": {
       "ip_tier": "약함~중간",

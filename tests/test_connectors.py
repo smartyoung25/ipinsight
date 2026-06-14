@@ -159,35 +159,93 @@ class TestRegionalConnector:
         assert "esg" in d
         assert "priority" in d
 
+    def test_analyze_jp_cn_in_ru(self):
+        """JP·CN·IN·RU 독립 지역 분기 검증"""
+        ctx = self.rc.analyze(["JP", "CN", "IN", "RU"], "manufacturing")
+        d = ctx.to_dict()
+        classified = d["regions"]["classified"]
+        assert "JP" in classified, "일본 JP 독립 지역 없음"
+        assert "CN" in classified, "중국 CN 독립 지역 없음"
+        assert "IN" in classified, "인도 IN 독립 지역 없음"
+        assert "RU" in classified, "러시아 RU 독립 지역 없음"
+
+    def test_jp_ip_env(self):
+        """일본 IP 환경 데이터 확인"""
+        from pipeline.connectors.regional_connector import IP_ENV
+        jp = IP_ENV.get("JP", {})
+        assert "JPO" in jp.get("patent_office", "")
+        assert jp.get("utility_model") is True
+        assert jp.get("avg_grant_months") == 14
+
+    def test_cn_special_risks(self):
+        """중국 특수 리스크 데이터 확인"""
+        from pipeline.connectors.regional_connector import IP_ENV
+        cn = IP_ENV.get("CN", {})
+        # special_risks 또는 caution 중 하나가 있어야 함
+        assert "special_risks" in cn or "caution" in cn
+        assert len(cn.get("special_risks", cn.get("caution", ""))) > 0
+
+    def test_ru_sanction_risk(self):
+        """러시아 제재 리스크 데이터 확인"""
+        from pipeline.connectors.regional_connector import IP_ENV, FUNDING_ENV
+        ru_ip  = IP_ENV.get("RU", {})
+        ru_fin = FUNDING_ENV.get("RU", {})
+        assert "sanction_risk" in ru_ip
+        assert "sanction_risk" in ru_fin
+
+    def test_sanction_check(self):
+        """제재 체크 기능"""
+        result = self.rc.sanction_check(["KR", "US", "RU", "CN", "VN"])
+        checks = {c["country"]: c["risk_level"] for c in result["sanction_check"]}
+        assert checks["RU"] == "HIGH"
+        assert checks["CN"] == "MEDIUM"
+        assert checks["KR"] == "LOW"
+        assert checks["VN"] == "LOW"
+
     def test_analyze_includes_dev(self):
         ctx = self.rc.analyze(["KR", "VN", "NG", "BR"], "agritech")
         d = ctx.to_dict()
         assert "DEV" in d["regions"]["classified"]
 
+    def test_in_not_in_dev(self):
+        """IN이 DEV에서 독립했는지 확인"""
+        from pipeline.connectors.regional_connector import classify_region
+        assert classify_region("IN") == "IN", "인도는 DEV가 아닌 IN 지역이어야 함"
+        assert classify_region("VN") == "DEV", "베트남은 DEV 지역이어야 함"
+
     def test_priority_sorted(self):
-        ctx = self.rc.analyze(["KR", "US", "VN"], "software_saas")
+        ctx = self.rc.analyze(["KR", "US", "JP", "CN", "IN", "RU"], "manufacturing")
         scores = [p["entry_score"] for p in ctx.priority]
         assert scores == sorted(scores, reverse=True)
+        # 러시아는 제재로 최하위여야 함
+        ru_entry = next(p for p in ctx.priority if p["region"] == "RU")
+        assert ru_entry["entry_score"] <= 40
 
-    def test_dev_country_detail(self):
-        result = self.rc.dev_country_detail("VN", "agritech")
-        assert "country" in result
-        assert result["country"] == "VN"
-        assert "leapfrog" in result
+    def test_country_profile_jp(self):
+        result = self.rc.country_profile("JP", "agritech")
+        assert result["region"] == "JP"
+        assert "patent_office" in result["ip"]
 
     def test_patent_filing_strategy(self):
-        result = self.rc.patent_filing_strategy(["KR", "US", "EU", "VN"], budget_usd=30_000)
+        result = self.rc.patent_filing_strategy(["KR", "US", "JP", "CN", "IN"], budget_usd=30_000)
         assert "recommended_order" in result
         assert "total_cost_usd" in result
-        assert "pct_first" in result
         assert result["pct_first"] is True
+        regions = [o["region"] for o in result["recommended_order"]]
+        assert "JP" in regions
+        assert "CN" in regions
+        assert "IN" in regions
 
     def test_classify_regions(self):
         from pipeline.connectors.regional_connector import classify_regions
-        result = classify_regions(["KR", "US", "DE", "VN", "NG"])
-        assert "KR" in result
-        assert "US" in result
-        assert "EU" in result
+        result = classify_regions(["KR", "US", "DE", "JP", "CN", "IN", "RU", "VN", "NG"])
+        assert "KR"  in result
+        assert "US"  in result
+        assert "EU"  in result
+        assert "JP"  in result
+        assert "CN"  in result
+        assert "IN"  in result
+        assert "RU"  in result
         assert "DEV" in result
 
 
