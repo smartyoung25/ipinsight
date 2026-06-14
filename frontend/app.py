@@ -15,6 +15,9 @@ PAGE_NAMES = {
     "📊 가치평가": "valuation",
     "🗺️ 전체 로드맵": "roadmap",
     "📡 IP 분석": "ip",
+    "📝 인터뷰 관리 (G4)": "interviews",
+    "💼 사업모델 설계 (G5)": "bm",
+    "📈 성과 모니터링 (G10)": "kpi",
     "⚙️ 운영 메트릭": "metrics",
 }
 
@@ -406,3 +409,369 @@ elif st.session_state.page == "metrics":
                         st.json(job["result"])
                 if job.get("error"):
                     st.error(f"오류: {job['error']}")
+
+
+# ═══════════════════════════════════════════════════════════════
+# 페이지: G4 인터뷰 관리
+# ═══════════════════════════════════════════════════════════════
+elif st.session_state.page == "interviews":
+    st.title("📝 G4 고객검증 — NSF I-Corps 인터뷰 관리")
+
+    tech_id = st.text_input("기술 ID", value="DEMO-001", key="iv_tech_id")
+
+    tab_add, tab_view, tab_loi = st.tabs(["➕ 인터뷰 추가", "📊 현황 대시보드", "📄 LoI 생성"])
+
+    with tab_add:
+        st.subheader("인터뷰 기록 추가")
+        with st.form("interview_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                customer_type = st.selectbox("고객 유형", ["기업", "병원", "대학", "정부기관", "스타트업", "개인"])
+                pain_point = st.text_area("Pain Point (핵심 문제)", height=80)
+                jtbd = st.text_area("JTBD (해결하려는 과업)", height=80)
+            with col2:
+                willingness_to_pay = st.number_input("지불 의향 (원/월)", min_value=0, value=100_000, step=10_000)
+                loi_interest = st.checkbox("LoI 서명 의향 있음")
+                poc_interest = st.checkbox("PoC 참여 의향 있음")
+                interview_date = st.date_input("인터뷰 날짜")
+                interviewer = st.text_input("인터뷰어", value="연구자")
+            submitted = st.form_submit_button("✅ 인터뷰 저장", type="primary")
+
+        if submitted:
+            result = api_post("/g4/interviews", {
+                "tech_id": tech_id,
+                "interviews": [{
+                    "customer_type": customer_type,
+                    "pain_point": pain_point,
+                    "jtbd": jtbd,
+                    "willingness_to_pay_krw": willingness_to_pay,
+                    "loi_interest": loi_interest,
+                    "poc_interest": poc_interest,
+                    "interview_date": str(interview_date),
+                    "interviewer": interviewer,
+                }]
+            })
+            if result:
+                total = result.get("total_interviews", 0)
+                st.success(f"저장 완료 — 누적 인터뷰 {total}건")
+                if total >= 100:
+                    st.balloons()
+                    st.success("🎉 NSF I-Corps 목표 100건 달성!")
+
+    with tab_view:
+        st.subheader("인터뷰 현황")
+        data = api_get(f"/g4/interviews/{tech_id}")
+        if data:
+            meta = data.get("meta", {})
+            total = meta.get("total_interviews", 0)
+            loi_c = meta.get("loi_interested", 0)
+            poc_c = meta.get("poc_interested", 0)
+
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("총 인터뷰", total, f"목표 100건")
+            c2.metric("LoI 의향", loi_c)
+            c3.metric("PoC 의향", poc_c)
+            c4.metric("진도율", f"{min(total/100*100, 100):.0f}%")
+
+            # 진행 막대
+            st.progress(min(total / 100, 1.0), text=f"NSF I-Corps 목표: {total}/100건")
+
+            jtbd = data.get("jtbd_analysis", {})
+            if jtbd:
+                st.subheader("JTBD 분석")
+                top_pains = jtbd.get("top_pain_points", [])
+                if top_pains:
+                    st.write("**주요 Pain Point:**")
+                    for p in top_pains[:5]:
+                        st.markdown(f"- {p}")
+
+            interviews = data.get("interviews", [])
+            if interviews:
+                import pandas as pd
+                df = pd.DataFrame(interviews)
+                cols_show = [c for c in ["customer_type", "pain_point", "willingness_to_pay_krw",
+                                          "loi_interest", "poc_interest", "interview_date"] if c in df.columns]
+                st.dataframe(df[cols_show], use_container_width=True)
+        else:
+            st.info("인터뷰 기록 없음. '인터뷰 추가' 탭에서 시작하세요.")
+
+    with tab_loi:
+        st.subheader("LoI (도입의향서) 자동 생성")
+        st.info("LoI 서명 의향자가 1명 이상일 때 자동 생성됩니다.")
+        org_name = st.text_input("발행 기관명", value="KAIST 기술사업화팀")
+        tech_name_loi = st.text_input("기술명", value="스마트팜 AI")
+
+        if st.button("📄 LoI 템플릿 생성", type="primary"):
+            result = api_post("/g4/loi-template", {
+                "tech_id": tech_id,
+                "org_name": org_name,
+                "tech_name": tech_name_loi,
+            })
+            if result:
+                loi = result.get("loi_template", result)
+                st.success("LoI 템플릿 생성 완료")
+                with st.expander("📄 LoI 내용 보기", expanded=True):
+                    st.json(loi)
+            else:
+                st.warning("LoI 생성 실패 — LoI 의향 인터뷰가 필요합니다.")
+
+
+# ═══════════════════════════════════════════════════════════════
+# 페이지: G5 사업모델 설계
+# ═══════════════════════════════════════════════════════════════
+elif st.session_state.page == "bm":
+    st.title("💼 G5 사업모델 설계 — BM Canvas · Unit Economics · 로드맵")
+
+    tech_id = st.text_input("기술 ID", value="DEMO-001", key="bm_tech_id")
+
+    tab_bm, tab_ue, tab_rm = st.tabs(["🎨 BM Canvas", "💰 Unit Economics", "🗺️ 사업화 로드맵"])
+
+    with tab_bm:
+        st.subheader("BM Canvas 생성 (G5)")
+        with st.form("bm_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                tech_name = st.text_input("기술명", "스마트팜 AI")
+                model_type = st.selectbox("BM 유형", ["SaaS", "라이선싱", "서비스", "제조판매", "플랫폼"])
+                target_market = st.text_input("목표 시장", "국내 스마트팜 온실 농가")
+            with col2:
+                loi_count = st.number_input("LoI 수 (G4에서 확보)", min_value=0, value=0)
+                poc_req = st.number_input("PoC 요청 수", min_value=0, value=0)
+                trl = st.slider("현재 TRL", 1, 9, 4, key="bm_trl")
+            submitted = st.form_submit_button("⚡ BM 분석 실행", type="primary")
+
+        if submitted:
+            with st.spinner("G5 BM 분석 중 (로드맵·SMK 자동 생성)..."):
+                result = api_post("/g5/assess", {
+                    "tech_id": tech_id,
+                    "input_data": {
+                        "tech_name": tech_name,
+                        "model_type": model_type,
+                        "target_market": target_market,
+                        "loi_count": loi_count,
+                        "poc_requests": poc_req,
+                        "trl": trl,
+                    }
+                })
+            if result:
+                gate = result.get("gate", "")
+                score = result.get("score", 0)
+                icon = {"Go": "🟢", "Hold": "🟡", "Kill": "🔴"}.get(gate, "⚪")
+                st.metric("G5 Gate", f"{icon} {gate}", f"점수 {score:.1f}")
+
+                out = result.get("output_doc", {})
+                canvas = out.get("canvas", {})
+                if canvas:
+                    st.subheader("Business Model Canvas")
+                    bm_cols = st.columns(3)
+                    sections = [
+                        ("고객 세그먼트", canvas.get("customer_segments", [])),
+                        ("가치 제안", canvas.get("value_propositions", [])),
+                        ("수익 모델", canvas.get("revenue_streams", [])),
+                    ]
+                    for col, (title, items) in zip(bm_cols, sections):
+                        with col:
+                            st.markdown(f"**{title}**")
+                            for item in (items if isinstance(items, list) else [items]):
+                                st.markdown(f"- {item}")
+
+                if out.get("smk_triggered"):
+                    st.success("✅ SMK(사업화시장키트) 자동 생성 완료")
+
+                with st.expander("전체 결과 JSON"):
+                    st.json(result)
+
+    with tab_ue:
+        st.subheader("Unit Economics 분석")
+        with st.form("ue_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                cac = st.number_input("CAC (고객획득비용, 원)", min_value=0, value=500_000, step=50_000)
+                ltv = st.number_input("LTV (고객생애가치, 원)", min_value=0, value=3_000_000, step=100_000)
+                churn = st.slider("Churn율 (%/월)", 0.0, 30.0, 5.0)
+            with col2:
+                arpu = st.number_input("ARPU (월 매출/고객, 원)", min_value=0, value=200_000, step=10_000)
+                gross_margin = st.slider("Gross Margin (%)", 0, 100, 70)
+            submitted_ue = st.form_submit_button("📊 Unit Economics 분석", type="primary")
+
+        if submitted_ue:
+            result = api_post("/execution/unit-economics", {
+                "tech_id": tech_id,
+                "input_data": {
+                    "cac_krw": cac, "ltv_krw": ltv,
+                    "churn_rate_pct": churn, "arpu_krw": arpu,
+                    "gross_margin_pct": gross_margin,
+                }
+            })
+            if result:
+                out = result.get("output_doc", {})
+                ltv_cac = out.get("ltv_cac_ratio", ltv / max(cac, 1))
+                payback = out.get("payback_months", cac / max(arpu * gross_margin / 100, 1))
+                c1, c2, c3 = st.columns(3)
+                c1.metric("LTV/CAC", f"{ltv_cac:.1f}x", "3.0x 이상 권장")
+                c2.metric("Payback 기간", f"{payback:.1f}개월", "12개월 이내 권장")
+                c3.metric("Gross Margin", f"{gross_margin}%")
+                with st.expander("상세 분석"):
+                    st.json(result)
+
+    with tab_rm:
+        st.subheader("사업화 로드맵 생성")
+        with st.form("rm_form"):
+            tech_name_rm = st.text_input("기술명", "스마트팜 AI", key="rm_name")
+            trl_cur = st.slider("현재 TRL", 1, 9, 4, key="rm_trl_cur")
+            trl_tgt = st.slider("목표 TRL", 1, 9, 9, key="rm_trl_tgt")
+            submitted_rm = st.form_submit_button("🗺️ 로드맵 생성", type="primary")
+
+        if submitted_rm:
+            with st.spinner("사업화 로드맵 생성 중..."):
+                result = api_post("/g5/roadmap", {
+                    "tech_id": tech_id,
+                    "input_data": {
+                        "tech_name": tech_name_rm,
+                        "trl_current": trl_cur,
+                        "trl_target": trl_tgt,
+                    }
+                })
+            if result:
+                st.success("로드맵 생성 완료")
+                out = result.get("output_doc", result)
+                milestones = out.get("milestones", [])
+                if milestones:
+                    import pandas as pd
+                    df = pd.DataFrame(milestones)
+                    st.dataframe(df, use_container_width=True)
+                with st.expander("전체 JSON"):
+                    st.json(result)
+
+
+# ═══════════════════════════════════════════════════════════════
+# 페이지: G10 성과 모니터링
+# ═══════════════════════════════════════════════════════════════
+elif st.session_state.page == "kpi":
+    st.title("📈 G10 성과 모니터링 — KPI 실시간 대시보드")
+
+    tech_id = st.text_input("기술 ID", value="DEMO-001", key="kpi_tech_id")
+
+    tab_dash, tab_record, tab_alert = st.tabs(["📊 대시보드", "✏️ KPI 기록", "🔔 알림"])
+
+    with tab_dash:
+        st.subheader("KPI 현황")
+        if st.button("🔄 새로고침", key="kpi_refresh"):
+            pass
+
+        data = api_get(f"/g10/kpi/{tech_id}")
+        if data and data.get("event_count", 0) > 0:
+            latest = data.get("latest_kpis", {})
+
+            KPI_LABELS = {
+                "revenue_usd": ("매출액", "USD", 1_000_000),
+                "royalty_usd": ("로열티", "USD", 100_000),
+                "investment_raised_usd": ("투자유치", "USD", 500_000),
+                "poc_to_commercial_rate_pct": ("PoC→사업화율", "%", 30),
+                "tech_utilization_rate_pct": ("기술활용율", "%", 70),
+                "new_customers": ("신규고객", "건", 10),
+            }
+
+            cols = st.columns(3)
+            for i, (key, (label, unit, target)) in enumerate(KPI_LABELS.items()):
+                val = latest.get(key, 0)
+                pct = val / target * 100 if target else 0
+                delta = f"{pct:.0f}% 달성"
+                cols[i % 3].metric(f"{label} ({unit})", f"{val:,.1f}", delta)
+
+            st.divider()
+            st.subheader("KPI 이벤트 이력")
+            events = data.get("events", [])
+            if events:
+                import pandas as pd
+                df = pd.DataFrame(events)
+                st.dataframe(df[["kpi_key", "value", "recorded_at", "source"]],
+                             use_container_width=True)
+
+            # Plotly 추이 차트
+            try:
+                import plotly.express as px
+                df_all = pd.DataFrame(events)
+                if "kpi_key" in df_all.columns:
+                    fig = px.line(
+                        df_all.sort_values("recorded_at"),
+                        x="recorded_at", y="value", color="kpi_key",
+                        title="KPI 추이",
+                        labels={"recorded_at": "시각", "value": "값", "kpi_key": "KPI"},
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+            except Exception:
+                pass
+        else:
+            st.info("KPI 기록 없음. 'KPI 기록' 탭에서 입력하세요.")
+
+    with tab_record:
+        st.subheader("KPI 단건 기록")
+        with st.form("kpi_single"):
+            kpi_key = st.selectbox("KPI 항목", [
+                "revenue_usd", "royalty_usd", "investment_raised_usd",
+                "poc_to_commercial_rate_pct", "tech_utilization_rate_pct", "new_customers"
+            ])
+            kpi_val = st.number_input("값", min_value=0.0, value=0.0, step=1000.0)
+            kpi_note = st.text_input("메모 (선택)")
+            submitted_kpi = st.form_submit_button("✅ KPI 기록", type="primary")
+
+        if submitted_kpi:
+            result = api_post("/g10/kpi", {
+                "tech_id": tech_id, "kpi_key": kpi_key,
+                "value": kpi_val, "note": kpi_note, "source": "dashboard"
+            })
+            if result:
+                st.success(f"{kpi_key} = {kpi_val:,.1f} 기록 완료")
+
+        st.divider()
+        st.subheader("KPI 일괄 기록")
+        with st.form("kpi_batch"):
+            col1, col2 = st.columns(2)
+            with col1:
+                revenue = st.number_input("매출액 (USD)", min_value=0.0, value=0.0, step=1000.0)
+                royalty = st.number_input("로열티 (USD)", min_value=0.0, value=0.0, step=1000.0)
+                investment = st.number_input("투자유치 (USD)", min_value=0.0, value=0.0, step=10000.0)
+            with col2:
+                poc_rate = st.number_input("PoC→사업화율 (%)", min_value=0.0, max_value=100.0, value=0.0)
+                util_rate = st.number_input("기술활용율 (%)", min_value=0.0, max_value=100.0, value=0.0)
+                customers = st.number_input("신규고객 (건)", min_value=0, value=0)
+            submitted_batch = st.form_submit_button("📤 일괄 기록", type="primary")
+
+        if submitted_batch:
+            actuals = {
+                "revenue_usd": revenue, "royalty_usd": royalty,
+                "investment_raised_usd": investment,
+                "poc_to_commercial_rate_pct": poc_rate,
+                "tech_utilization_rate_pct": util_rate,
+                "new_customers": float(customers),
+            }
+            result = api_post("/g10/kpi/batch", {"tech_id": tech_id, "actuals": actuals})
+            if result:
+                st.success(f"KPI {result.get('recorded', 0)}개 항목 기록 완료")
+
+    with tab_alert:
+        st.subheader("🔔 KPI 알림")
+        alerts_data = api_get(f"/g10/kpi/{tech_id}/alerts")
+        if alerts_data:
+            alerts = alerts_data.get("alerts", [])
+            count = alerts_data.get("alert_count", 0)
+            has_danger = alerts_data.get("has_danger", False)
+
+            if count == 0:
+                st.success("✅ 모든 KPI 정상 범위")
+            else:
+                if has_danger:
+                    st.error(f"🚨 위험 알림 포함 — 총 {count}건")
+                else:
+                    st.warning(f"⚠️ 경고 알림 {count}건")
+
+                for alert in alerts:
+                    level = alert.get("level", "warn")
+                    msg = alert.get("message", "")
+                    if level == "danger":
+                        st.error(f"🔴 {msg}")
+                    else:
+                        st.warning(f"🟡 {msg}")
+        else:
+            st.info("KPI 기록이 없어 알림을 생성할 수 없습니다.")

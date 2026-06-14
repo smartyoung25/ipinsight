@@ -29,6 +29,41 @@ def _get_db() -> sqlite3.Connection:
     return conn
 
 
+# KPI 알림 임계값 — danger(위험) / warn(경고) 기준
+_KPI_THRESHOLDS: dict[str, dict] = {
+    "revenue_usd":                {"danger": 0,      "warn": 100_000},
+    "royalty_usd":                {"danger": 0,      "warn": 10_000},
+    "investment_raised_usd":      {"danger": 0,      "warn": 50_000},
+    "poc_to_commercial_rate_pct": {"danger": 10,     "warn": 20},
+    "tech_utilization_rate_pct":  {"danger": 20,     "warn": 40},
+    "new_customers":              {"danger": 0,      "warn": 3},
+}
+
+
+def check_kpi_alerts(tech_id: str) -> list[dict]:
+    """최신 KPI 값을 임계값과 비교해 알림 목록 반환"""
+    latest = get_latest_kpis(tech_id)
+    alerts = []
+    for kpi_key, thresholds in _KPI_THRESHOLDS.items():
+        if kpi_key not in latest:
+            continue
+        value = latest[kpi_key]
+        if value <= thresholds["danger"]:
+            level = "danger"
+        elif value < thresholds["warn"]:
+            level = "warn"
+        else:
+            continue
+        alerts.append({
+            "kpi_key": kpi_key,
+            "value": value,
+            "threshold": thresholds[level],
+            "level": level,
+            "message": f"{kpi_key}={value:.1f} — {level.upper()} 임계값({thresholds[level]}) 이하",
+        })
+    return alerts
+
+
 def record_kpi_event(tech_id: str, kpi_key: str, value: float,
                      source: str = "manual", note: str = "") -> int:
     """KPI 이벤트 단건 기록 → row_id 반환"""

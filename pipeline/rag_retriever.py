@@ -27,10 +27,32 @@ def _chunk_text(text: str, chunk_size: int = 400, overlap: int = 80) -> list[str
 
 
 # ─────────────────────────────────────────────
-# 임베딩: chromadb → faiss → numpy 코사인 (우선순위)
+# 임베딩: sentence-transformers → numpy TF-IDF 폴백
 # ─────────────────────────────────────────────
+class _SentenceEmbedder:
+    """sentence-transformers 기반 의미검색 임베더 (설치 시 자동 사용)"""
+
+    def __init__(self):
+        from sentence_transformers import SentenceTransformer
+        self._model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+        self._cache: dict[str, list[float]] = {}
+
+    def fit(self, docs: list[str]) -> None:
+        pass  # sentence-transformers는 사전학습 모델 사용, fit 불필요
+
+    def embed(self, text: str) -> list[float]:
+        if text not in self._cache:
+            vec = self._model.encode(text, normalize_embeddings=True)
+            self._cache[text] = vec.tolist()
+        return self._cache[text]
+
+    def cosine(self, a: list[float], b: list[float]) -> float:
+        # 이미 normalize된 벡터이므로 내적 = 코사인 유사도
+        return sum(x * y for x, y in zip(a, b))
+
+
 class _NumpyEmbedder:
-    """chromadb/faiss 미설치 시 TF-IDF 기반 폴백 임베더"""
+    """sentence-transformers 미설치 시 TF-IDF 기반 폴백 임베더"""
 
     def __init__(self):
         self._vocab: dict[str, int] = {}
@@ -66,6 +88,14 @@ class _NumpyEmbedder:
 
     def cosine(self, a: list[float], b: list[float]) -> float:
         return sum(x * y for x, y in zip(a, b))
+
+
+def _make_embedder():
+    """sentence-transformers 설치 여부에 따라 적절한 임베더 반환"""
+    try:
+        return _SentenceEmbedder()
+    except Exception:
+        return _NumpyEmbedder()
 
 
 # ─────────────────────────────────────────────
@@ -134,7 +164,7 @@ class RAGIndex:
     def __init__(self):
         self._docs:    list[dict]     = []
         self._vectors: list[list[float]] = []
-        self._embedder = _NumpyEmbedder()
+        self._embedder = _make_embedder()  # sentence-transformers 우선, TF-IDF 폴백
         self._built    = False
 
     def build(self, docs: Optional[list[dict]] = None) -> None:

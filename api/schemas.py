@@ -15,6 +15,7 @@ class PipelineRequest(BaseModel):
         ..., description="단계별 입력 데이터. {0: {...}, 1: {...}}"
     )
     stop_on_kill: bool = Field(True, description="Kill 판정 시 파이프라인 중단 여부")
+    auto_chain: bool = Field(True, description="이전 단계 결과를 다음 단계 입력에 자동 병합")
 
 
 class FundingMatchRequest(BaseModel):

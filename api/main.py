@@ -220,6 +220,7 @@ def run_full_pipeline(req: PipelineRequest):
         summary = pipeline.run_pipeline(
             stage_inputs=req.stage_inputs,
             stop_on_kill=req.stop_on_kill,
+            auto_chain=req.auto_chain,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1141,6 +1142,19 @@ def get_kpi_feed_endpoint(tech_id: str, limit: int = 50, _: dict = Depends(requi
         "latest_kpis": latest,
         "event_count": len(feed),
         "events":      feed,
+    }
+
+
+@app.get("/g10/kpi/{tech_id}/alerts", tags=["G10 성과관리"], summary="KPI 알림 조회")
+def get_kpi_alerts(tech_id: str, _: dict = Depends(require_auth)):
+    """tech_id의 최신 KPI 값을 임계값과 비교해 danger/warn 알림 반환."""
+    from agents.g10_performance_tracker import check_kpi_alerts
+    alerts = check_kpi_alerts(tech_id)
+    return {
+        "tech_id": tech_id,
+        "alert_count": len(alerts),
+        "has_danger": any(a["level"] == "danger" for a in alerts),
+        "alerts": alerts,
     }
 
 

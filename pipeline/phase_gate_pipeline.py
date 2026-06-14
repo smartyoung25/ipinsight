@@ -42,6 +42,50 @@ STAGE_NAMES = {
     10: "G10_성과관리",
 }
 
+# 단계 결과 → 다음 단계 입력 자동 전달 맵
+# key: 완료된 stage_num, value: StageResult → 추가 입력 dict 변환 함수
+_STAGE_OUTPUT_MAP: dict[int, object] = {
+    3: lambda r: {  # G3 시장성 → G4 고객검증
+        "market_size_usd": r.output_doc.get("market_analysis", {}).get("tam_usd", 0),
+        "target_segments": r.output_doc.get("market_analysis", {}).get("segments", []),
+        "industry_sector": r.output_doc.get("industry", ""),
+    },
+    4: lambda r: {  # G4 고객검증 → G5 BM설계
+        "loi_count": (
+            len(r.output_doc.get("loi_template", {}).get("signatories", []))
+            if isinstance(r.output_doc.get("loi_template"), dict)
+            else r.output_doc.get("loi_count", 0)
+        ),
+        "poc_requests": r.output_doc.get("poc_requests", 0),
+        "jtbd_summary": r.output_doc.get("jtbd_summary", ""),
+        "validated_segments": r.output_doc.get("validated_segments", []),
+        "interview_count": r.output_doc.get("interview_count", 0),
+    },
+    5: lambda r: {  # G5 BM설계 → G6 가치평가
+        "revenue_model": r.output_doc.get("revenue_streams", []),
+        "tam_usd": r.output_doc.get("market_size", {}).get("tam_usd", 0),
+        "unit_economics": r.output_doc.get("unit_economics", {}),
+        "business_model_type": r.output_doc.get("canvas", {}).get("model_type", ""),
+    },
+    6: lambda r: {  # G6 가치평가 → G7 PoC
+        "valuation_usd": r.output_doc.get("valuation_usd", 0),
+        "target_irr": r.output_doc.get("irr_pct", 15),
+    },
+    7: lambda r: {  # G7 PoC → G8 MRL/ARL
+        "poc_results": r.output_doc.get("poc_results", {}),
+        "trl_achieved": r.output_doc.get("trl_achieved", 0),
+    },
+    8: lambda r: {  # G8 MRL/ARL → G9 거래
+        "mrl": r.output_doc.get("mrl_score", 0),
+        "arl": r.output_doc.get("arl_score", 0),
+        "bottleneck_dimension": r.output_doc.get("bottleneck", ""),
+    },
+    9: lambda r: {  # G9 거래 → G10 성과관리
+        "deal_structure": r.output_doc.get("deal_structure", {}),
+        "royalty_rate": r.output_doc.get("royalty_rate_pct", 5),
+    },
+}
+
 
 class PhaseGatePipeline:
     def __init__(self, tech_id: str):
@@ -61,7 +105,6 @@ class PhaseGatePipeline:
         result = agent.assess(input_data)
         self.results[stage_num] = result
 
-        # 산출물 저장
         output_path = self.output_dir / f"{STAGE_NAMES[stage_num]}_result.json"
         output_path.write_text(result.to_json(), encoding="utf-8")
 
@@ -75,11 +118,17 @@ class PhaseGatePipeline:
 
         return result
 
-    def run_pipeline(self, stage_inputs: dict[int, dict], stop_on_kill: bool = True) -> dict:
+    def run_pipeline(
+        self,
+        stage_inputs: dict[int, dict],
+        stop_on_kill: bool = True,
+        auto_chain: bool = True,
+    ) -> dict:
         """
         G0~G10 순차 실행.
         stage_inputs: {0: {...}, 1: {...}, ...}
-        stop_on_kill: Kill 판정 시 파이프라인 중단 여부
+        stop_on_kill: Kill 판정 시 파이프라인 중단
+        auto_chain:   True이면 이전 단계 결과를 다음 단계 입력에 자동 병합 (_STAGE_OUTPUT_MAP)
         """
         summary = {
             "tech_id": self.tech_id,
@@ -87,13 +136,28 @@ class PhaseGatePipeline:
             "stages": [],
             "final_gate": "Go",
             "killed_at": None,
+            "auto_chain": auto_chain,
         }
 
         for stage_num in sorted(STAGE_AGENTS.keys()):
             if stage_num not in stage_inputs:
                 continue
 
-            result = self.run_stage(stage_num, stage_inputs[stage_num])
+            input_data = dict(stage_inputs[stage_num])
+
+            # 이전 단계 결과 자동 병합 (auto_chain=True, 명시 입력 우선)
+            if auto_chain and stage_num > 0:
+                prev = stage_num - 1
+                if prev in self.results and prev in _STAGE_OUTPUT_MAP:
+                    try:
+                        carried = _STAGE_OUTPUT_MAP[prev](self.results[prev])
+                        for k, v in carried.items():
+                            if k not in input_data:  # 명시 입력이 없을 때만 적용
+                                input_data[k] = v
+                    except Exception:
+                        pass
+
+            result = self.run_stage(stage_num, input_data)
 
             stage_summary = {
                 "stage": stage_num,
@@ -114,7 +178,6 @@ class PhaseGatePipeline:
 
         summary["end_time"] = datetime.now().isoformat()
 
-        # 전체 파이프라인 요약 저장
         summary_path = self.output_dir / "pipeline_summary.json"
         summary_path.write_text(
             json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"

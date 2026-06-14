@@ -21,3 +21,5 @@ streamlit>=1.35.0
 plotly>=5.22.0
 # LLM 백엔드 (Groq 무료 대체)
 openai>=1.40.0
+# RAG 의미검색 (설치 시 TF-IDF에서 자동 전환)
+sentence-transformers>=3.0.0
