@@ -374,15 +374,80 @@ def render_sidenav():
             st.session_state.page = pg; st.rerun()
 
 
+# ── 홈 흐름 세션 초기화 ──────────────────────────────────────────
+for _k, _v in {
+    "home_step":       1,          # 1=입력  2=단계추천  3=추가입력+실행
+    "home_text":       "",
+    "home_filename":   "",
+    "home_trl":        4,
+    "home_rec_stages": [],         # 추천 단계 목록 [{stage, reason, priority}]
+    "home_sel_stage":  None,       # 사용자가 선택한 단계 번호
+    "home_extra":      "",         # 추가 보완 자료 텍스트
+    "home_result":     None,       # 분석 결과
+    "home_stopped":    False,      # 중간 중단 여부
+}.items():
+    if _k not in st.session_state:
+        st.session_state[_k] = _v
+
+def _home_reset():
+    for k in ["home_step","home_text","home_filename","home_trl",
+              "home_rec_stages","home_sel_stage","home_extra","home_result","home_stopped"]:
+        del st.session_state[k]
+    st.rerun()
+
+def _recommend_stages(text: str, trl: int, filename: str) -> list[dict]:
+    """입력 텍스트/파일 기반 추천 단계 생성 (API 또는 규칙 기반)"""
+    # 키워드 기반 우선순위 규칙
+    text_lower = (text + filename).lower()
+    stages = []
+    if any(w in text_lower for w in ["청구항","claim","ipc","특허","patent","명세"]):
+        stages += [
+            {"stage":1,"label":"G1 IP 구조화","icon":"📋","reason":"특허 텍스트 감지 — PCML 청구항 구조 분석","priority":"🔴 필수"},
+            {"stage":2,"label":"G2 TRL 평가","icon":"🧪","reason":"기술 성숙도 기준선 확인","priority":"🟠 권장"},
+            {"stage":3,"label":"G3 시장성 분석","icon":"🌐","reason":"특허 기반 시장 규모 추정","priority":"🟡 선택"},
+        ]
+    elif any(w in text_lower for w in ["abstract","doi","arxiv","journal","학술","논문","paper"]):
+        stages += [
+            {"stage":2,"label":"G2 TRL 평가","icon":"🧪","reason":"논문 기반 TRL 현황 평가","priority":"🔴 필수"},
+            {"stage":1,"label":"G1 IP 구조화","icon":"📋","reason":"논문 기술의 특허 가능성 검토","priority":"🟠 권장"},
+            {"stage":3,"label":"G3 시장성 분석","icon":"🌐","reason":"연구 주제의 산업화 가능성","priority":"🟡 선택"},
+        ]
+    elif any(w in text_lower for w in ["시장","market","tam","sam","som","보고서","report"]):
+        stages += [
+            {"stage":3,"label":"G3 시장성 분석","icon":"🌐","reason":"시장보고서 기반 TAM/SAM 분석","priority":"🔴 필수"},
+            {"stage":5,"label":"G5 BM 설계","icon":"💼","reason":"시장 분석 → 비즈니스 모델 도출","priority":"🟠 권장"},
+            {"stage":6,"label":"G6 가치평가","icon":"💰","reason":"시장 규모 기반 기술가치 산정","priority":"🟡 선택"},
+        ]
+    elif any(w in text_lower for w in ["사업","biz","계획","revenue","수익","고객","customer"]):
+        stages += [
+            {"stage":5,"label":"G5 BM 설계","icon":"💼","reason":"사업계획서 기반 BM 검증","priority":"🔴 필수"},
+            {"stage":4,"label":"G4 고객검증","icon":"🤝","reason":"JTBD 고객 인터뷰 설계","priority":"🟠 권장"},
+            {"stage":6,"label":"G6 가치평가","icon":"💰","reason":"사업계획 기반 투자가치 산정","priority":"🟡 선택"},
+        ]
+    else:
+        stages += [
+            {"stage":0,"label":"G0 기술발굴","icon":"🔭","reason":"기술 기본 정보 등록 및 분류","priority":"🔴 필수"},
+            {"stage":1,"label":"G1 IP 구조화","icon":"📋","reason":"IP 포트폴리오 전략 수립","priority":"🟠 권장"},
+            {"stage":2,"label":"G2 TRL 평가","icon":"🧪","reason":"TRL 기준 사업화 준비도 평가","priority":"🟡 선택"},
+        ]
+
+    # TRL 기반 추가 추천
+    if trl >= 7:
+        stages.insert(0, {"stage":7,"label":"G7 PoC 실증","icon":"🔬",
+                          "reason":f"TRL {trl} — PoC 단계 진입 가능","priority":"🔴 필수"})
+    elif trl >= 5:
+        stages.insert(0, {"stage":4,"label":"G4 고객검증","icon":"🤝",
+                          "reason":f"TRL {trl} — 고객검증 적기","priority":"🔴 필수"})
+    return stages[:5]
+
 # ════════════════════════════════════════════════════════════════
-# HOME — Claude 스타일 랜딩 화면
+# HOME — Claude 스타일 랜딩 화면 (3단계 위저드)
 # ════════════════════════════════════════════════════════════════
 if st.session_state.page == "home":
 
     health = api_get("/health", silent=True)
     api_ok = health is not None
 
-    # ── 좌측 패널 / 우측 패널 컬럼 ──
     left_col, right_col = st.columns([1, 3], gap="small")
 
     # ──────────── 좌측 패널 ────────────
@@ -457,213 +522,360 @@ if st.session_state.page == "home":
             if st.button("🔐 로그인", use_container_width=True, key="login_home"):
                 st.session_state.page = "admin"; st.rerun()
 
-    # ──────────── 우측 패널 ────────────
+    # ──────────── 우측 패널 (3단계 위저드) ────────────
     with right_col:
-        # 상단 여백
-        st.markdown("<div style='height:60px'></div>", unsafe_allow_html=True)
+        step = st.session_state.home_step
 
-        # 인사말
-        st.markdown(
-            "<div style='text-align:center;margin-bottom:32px'>"
-            "<div style='font-size:36px;font-weight:700;color:#f0f0f0;line-height:1.3'>"
-            "기술의 가치를 발견하세요</div>"
-            "<div style='font-size:14px;color:#666;margin-top:8px'>"
-            "특허·논문·사업계획서·기술명 — 무엇이든 입력하면 G0→G10 사업화 분석이 시작됩니다</div>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
+        # ── 스텝 진행 표시 ──────────────────────────────────────────
+        STEPS = ["① 자료 입력", "② 단계 추천", "③ 추가 입력 · 실행"]
+        prog_html = "<div style='display:flex;gap:0;margin-bottom:28px;margin-top:16px'>"
+        for i, s_label in enumerate(STEPS, 1):
+            active  = (i == step)
+            done    = (i < step)
+            bg      = "#2563eb" if active else ("#16a34a" if done else "#2a2a2a")
+            txt_clr = "#fff" if (active or done) else "#555"
+            prog_html += (
+                f"<div style='flex:1;padding:8px 6px;text-align:center;"
+                f"background:{bg};color:{txt_clr};font-size:12px;font-weight:600;"
+                f"border-radius:{('8px 0 0 8px' if i==1 else ('0 8px 8px 0' if i==3 else '0'))}'>"
+                f"{'✓ ' if done else ''}{s_label}</div>"
+            )
+            if i < 3:
+                prog_html += "<div style='width:2px;background:#111'></div>"
+        prog_html += "</div>"
+        st.markdown(prog_html, unsafe_allow_html=True)
 
-        # ── 입력 모드 탭 ──
-        mode_labels = {
-            "text":      ("✏️",  "직접 입력"),
-            "patent_no": ("📄",  "특허번호"),
-            "paper":     ("🎓",  "논문 정보"),
-            "bizplan":   ("📊",  "사업계획서"),
-            "file":      ("📎",  "파일 업로드"),
-        }
-        tab_cols = st.columns(len(mode_labels))
-        for i, (mode_key, (icon, label)) in enumerate(mode_labels.items()):
-            is_active = st.session_state.input_mode == mode_key
-            btn_type  = "primary" if is_active else "secondary"
-            with tab_cols[i]:
-                if st.button(f"{icon} {label}", use_container_width=True,
-                             type=btn_type, key=f"mode_{mode_key}"):
-                    st.session_state.input_mode = mode_key
-                    st.rerun()
+        # ════════════════════════════════
+        # STEP 1 — 자료 입력
+        # ════════════════════════════════
+        if step == 1:
+            st.markdown(
+                "<div style='text-align:center;margin-bottom:24px'>"
+                "<div style='font-size:30px;font-weight:700;line-height:1.3'>"
+                "기술의 가치를 발견하세요</div>"
+                "<div style='font-size:13px;color:#888;margin-top:6px'>"
+                "텍스트 또는 파일을 입력하면 최적의 사업화 경로를 추천해 드립니다</div>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
 
-        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+            # 입력 탭: 텍스트 / 파일
+            tab_text, tab_file = st.tabs(["✏️ 텍스트 입력", "📎 파일 업로드"])
 
-        mode = st.session_state.input_mode
-
-        # ── 모드별 입력 폼 ──
-        with st.form("landing_form", clear_on_submit=False):
-
-            if mode == "text":
-                user_input = st.text_area(
-                    "기술 설명",
+            with tab_text:
+                text_val = st.text_area(
+                    "내용",
                     placeholder=(
-                        "기술명, 특허 청구항, 기술 요약 등을 자유롭게 입력하세요.\n\n"
+                        "아래 중 무엇이든 자유롭게 붙여넣으세요:\n\n"
+                        "• 특허 청구항 또는 명세서\n"
+                        "• 논문 제목 + 초록 (Abstract)\n"
+                        "• 기술 개요 또는 기술명\n"
+                        "• 사업계획서 요약\n"
+                        "• 시장보고서 핵심 내용\n\n"
                         "예시:\n"
-                        "• 청구항 1: 딥러닝 기반 작물 수확량 예측 방법으로서...\n"
-                        "• 본 발명은 IoT 센서와 머신러닝을 결합하여..."
+                        "청구항 1: 딥러닝 기반 작물 수확량 예측 방법으로서, IoT 센서로부터 수집된..."
                     ),
-                    height=160, label_visibility="collapsed",
-                )
-                tech_id_input   = st.text_input("기술 ID (선택)", placeholder="예: KR-2024-AI-001", value="")
-                tech_name_input = st.text_input("기술명 (선택)", placeholder="예: 스마트팜 수확량 예측 AI", value="")
-                patent_no_input = ""
-                paper_title     = ""; paper_doi = ""; paper_abstract = ""
-                biz_summary     = ""; biz_target = ""
-                uploaded_file   = None
-
-            elif mode == "patent_no":
-                st.markdown("##### 특허번호로 분석")
-                patent_no_input = st.text_input(
-                    "특허번호",
-                    placeholder="KR10-2023-0001234  /  US11234567  /  EP3456789",
+                    height=200,
                     label_visibility="collapsed",
+                    key="step1_text",
                 )
-                c1, c2 = st.columns(2)
-                tech_id_input   = c1.text_input("기술 ID", placeholder="자동 생성됨", value="")
-                tech_name_input = c2.text_input("기술명 (선택)", placeholder="특허 제목에서 자동 추출", value="")
-                user_input = patent_no_input
-                paper_title = ""; paper_doi = ""; paper_abstract = ""
-                biz_summary = ""; biz_target = ""
-                uploaded_file = None
 
-            elif mode == "paper":
-                st.markdown("##### 논문 정보 입력")
-                c1, c2 = st.columns(2)
-                paper_title    = c1.text_input("논문 제목", placeholder="예: Deep Learning for Crop Yield Prediction")
-                paper_doi      = c2.text_input("DOI / arXiv", placeholder="10.1000/xyz123  또는  arXiv:2301.00000")
-                paper_abstract = st.text_area("초록 (Abstract)", height=120,
-                                              placeholder="논문 초록을 붙여넣으세요...")
-                tech_name_input = st.text_input("파생 기술명 (선택)", placeholder="논문에서 파생될 기술명")
-                user_input      = f"{paper_title}\n{paper_doi}\n{paper_abstract}"
-                tech_id_input   = ""; patent_no_input = ""
-                biz_summary = ""; biz_target = ""
-                uploaded_file = None
-
-            elif mode == "bizplan":
-                st.markdown("##### 사업계획서 정보 입력")
-                biz_summary = st.text_area(
-                    "기술/사업 요약",
-                    height=130,
-                    placeholder=(
-                        "사업계획서의 핵심 내용을 입력하세요.\n"
-                        "• 개발 기술 개요\n• 목표 시장 및 고객\n• 수익 모델\n• 기대 효과"
-                    ),
+            with tab_file:
+                st.markdown(
+                    "<div style='font-size:12px;color:#888;margin-bottom:8px'>"
+                    "특허명세서 · 논문 · 사업계획서 · 시장보고서 등</div>",
+                    unsafe_allow_html=True,
                 )
-                c1, c2 = st.columns(2)
-                biz_target      = c1.text_input("목표 시장", placeholder="예: 국내 온실 농가 2만 호")
-                tech_name_input = c2.text_input("기술명", placeholder="예: AI 작물 관리 SaaS")
-                user_input      = f"{biz_summary}\n목표시장: {biz_target}"
-                tech_id_input   = ""; patent_no_input = ""
-                paper_title = ""; paper_doi = ""; paper_abstract = ""
-                uploaded_file = None
-
-            else:  # file
-                st.markdown("##### 파일 업로드")
-                uploaded_file = st.file_uploader(
-                    "파일 선택",
-                    type=["pdf", "txt", "docx", "hwp", "xlsx", "png", "jpg"],
+                uploaded = st.file_uploader(
+                    "파일",
+                    type=["pdf","txt","docx","hwp","xlsx","pptx","png","jpg"],
                     label_visibility="collapsed",
-                    help="특허명세서 PDF, 사업계획서 DOCX, 논문 PDF, 기술개요 TXT 등",
+                    key="step1_file",
+                    help="PDF, DOCX, HWP, XLSX, PPTX, TXT, 이미지 지원",
                 )
-                tech_name_input = st.text_input("기술명 (선택)", placeholder="파일에서 자동 추출 시도")
-                user_input      = uploaded_file.name if uploaded_file else ""
-                tech_id_input   = ""; patent_no_input = ""
-                paper_title = ""; paper_doi = ""; paper_abstract = ""
-                biz_summary = ""; biz_target = ""
+                if uploaded:
+                    st.success(f"✅ {uploaded.name} ({uploaded.size//1024}KB) 업로드됨")
+                    st.caption("파일 내용은 분석 시 자동 추출됩니다.")
 
-            st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
-            # TRL 슬라이더
-            trl_val = st.select_slider(
-                "현재 TRL 단계",
+            # 기술명 + TRL
+            c1, c2 = st.columns([2, 1])
+            tech_name_in = c1.text_input(
+                "기술명 (선택 · 자동 추출 가능)",
+                placeholder="예: 스마트팜 수확량 예측 AI",
+                key="step1_name",
+            )
+            trl_in = c2.select_slider(
+                "현재 TRL",
                 options=list(range(1, 10)),
-                value=4,
-                format_func=lambda x: {
-                    1:"TRL1 기초연구",2:"TRL2 개념정립",3:"TRL3 개념검증",
-                    4:"TRL4 실험실검증",5:"TRL5 파일럿",6:"TRL6 시제품",
-                    7:"TRL7 시스템검증",8:"TRL8 인증",9:"TRL9 상용화",
-                }[x],
+                value=st.session_state.home_trl,
+                format_func=lambda x: f"TRL {x}",
+                key="step1_trl",
             )
 
-            # 제출
-            submitted = st.form_submit_button(
-                "🚀  분석 시작",
-                use_container_width=True,
-                type="primary",
-            )
-
-        if submitted and (user_input or uploaded_file):
-            # 기술 ID 자동 생성
-            import time as _time
-            auto_id = tech_id_input.strip() or f"TECH-{int(_time.time()) % 100000}"
-            auto_name = tech_name_input.strip() or (
-                patent_no_input.strip() or
-                paper_title[:30] or
-                biz_target[:30] or
-                user_input[:30].replace("\n", " ") or
-                "분석 기술"
-            )
-
-            st.session_state.tech_id   = auto_id
-            st.session_state.tech_name = auto_name
-            st.session_state.trl       = trl_val
-            st.session_state.ipc       = ""
-            st.session_state.stage_gates = {}
-
-            # 최근 분석 목록에 추가
-            new_recent = {"id": auto_id, "name": auto_name, "trl": trl_val, "icon": "🔬"}
-            recs = [r for r in st.session_state.recent_techs if r["id"] != auto_id]
-            st.session_state.recent_techs = [new_recent] + recs[:4]
-
-            # 입력 유형에 따라 첫 분석 화면으로 이동
-            if mode in ("patent_no", "text") and (patent_no_input or user_input):
-                st.session_state.page = "ip_hub"
-            elif mode == "paper":
-                st.session_state.page = "ip_hub"
-            elif mode == "bizplan":
-                st.session_state.page = "bm"
-            else:
-                st.session_state.page = "workspace"
-            st.rerun()
-
-        elif submitted:
-            st.warning("입력값을 먼저 작성해 주세요.")
-
-        # ── 예시 칩 ──
-        st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
-        st.markdown(
-            "<div style='text-align:center;font-size:11px;color:#555;margin-bottom:10px'>"
-            "빠른 시작 예시</div>",
-            unsafe_allow_html=True,
-        )
-        chip_data = [
-            ("📄", "KR10-2021-0112233", "patent_no"),
-            ("🌱", "스마트팜 수확량 AI", "text"),
-            ("⚡", "차세대 배터리 양극재", "text"),
-            ("🧬", "mRNA 백신 전달체", "text"),
-            ("🤖", "US10123456 (robotics)", "patent_no"),
-            ("🎓", "IEEE 논문 기술이전", "paper"),
-        ]
-        chip_cols = st.columns(3)
-        for i, (icon, label, chip_mode) in enumerate(chip_data):
-            with chip_cols[i % 3]:
-                if st.button(f"{icon} {label}", use_container_width=True,
-                             key=f"chip_{i}"):
-                    st.session_state.input_mode = chip_mode
-                    st.session_state.tech_name  = label
-                    st.session_state.tech_id    = f"DEMO-{i+10}"
-                    st.session_state.trl        = 4
-                    st.session_state.stage_gates = {}
-                    new_r = {"id": f"DEMO-{i+10}", "name": label, "trl": 4, "icon": icon}
-                    recs2 = [r for r in st.session_state.recent_techs if r["id"] != f"DEMO-{i+10}"]
-                    st.session_state.recent_techs = [new_r] + recs2[:4]
-                    st.session_state.page = "workspace"
+            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+            if st.button("다음 — 추천 단계 확인 →", type="primary",
+                         use_container_width=True, key="step1_next"):
+                text_in   = st.session_state.get("step1_text", "")
+                file_name = uploaded.name if (uploaded := st.session_state.get("step1_file")) else ""
+                if not text_in.strip() and not file_name:
+                    st.warning("텍스트를 입력하거나 파일을 업로드해 주세요.")
+                else:
+                    st.session_state.home_text     = text_in.strip()
+                    st.session_state.home_filename = file_name
+                    st.session_state.home_trl      = trl_in
+                    st.session_state.tech_name     = tech_name_in.strip() or text_in[:30].replace("\n"," ") or file_name or "분석 기술"
+                    st.session_state.home_rec_stages = _recommend_stages(text_in, trl_in, file_name)
+                    st.session_state.home_step     = 2
                     st.rerun()
+
+            # 빠른 예시 칩
+            st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='font-size:11px;color:#555;text-align:center;margin-bottom:8px'>빠른 예시로 시작</div>",
+                        unsafe_allow_html=True)
+            EXAMPLES = [
+                ("🌱", "스마트팜 수확량 예측 AI", "청구항 1: 딥러닝 기반 작물 수확량 예측 방법으로서, IoT 센서 데이터와 기상 정보를 결합하여...", 4),
+                ("⚡", "차세대 리튬-황 배터리",   "본 발명은 황화리튬 복합 양극재를 이용한 고에너지밀도 배터리 셀에 관한 것으로...", 5),
+                ("🧬", "mRNA 백신 전달체",       "Abstract: A novel lipid nanoparticle formulation for efficient mRNA delivery...", 6),
+                ("🤖", "협동로봇 안전 제어",      "시장보고서 요약: 글로벌 협동로봇 시장은 2027년 95억 달러 규모로 성장 예상...", 3),
+            ]
+            ex_cols = st.columns(4)
+            for i, (icon, ex_name, ex_text, ex_trl) in enumerate(EXAMPLES):
+                with ex_cols[i]:
+                    if st.button(f"{icon}\n{ex_name}", use_container_width=True, key=f"ex_{i}"):
+                        import time as _t
+                        st.session_state.home_text      = ex_text
+                        st.session_state.home_trl       = ex_trl
+                        st.session_state.tech_name      = ex_name
+                        st.session_state.tech_id        = f"DEMO-{i+10}"
+                        st.session_state.home_rec_stages = _recommend_stages(ex_text, ex_trl, "")
+                        st.session_state.home_step      = 2
+                        new_r = {"id": f"DEMO-{i+10}", "name": ex_name, "trl": ex_trl, "icon": icon}
+                        st.session_state.recent_techs   = [new_r] + [r for r in st.session_state.recent_techs if r["id"] != f"DEMO-{i+10}"][:4]
+                        st.rerun()
+
+        # ════════════════════════════════
+        # STEP 2 — 단계 추천 & 선택
+        # ════════════════════════════════
+        elif step == 2:
+            name = st.session_state.tech_name or "입력 기술"
+            trl  = st.session_state.home_trl
+            recs = st.session_state.home_rec_stages
+
+            st.markdown(
+                f"<div style='margin-bottom:20px'>"
+                f"<div style='font-size:22px;font-weight:700'>📊 분석 단계 추천</div>"
+                f"<div style='font-size:13px;color:#888;margin-top:4px'>"
+                f"<b style='color:#e2e8f0'>{name}</b> · TRL {trl} — 입력 자료를 분석한 결과입니다</div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+            # 입력 자료 미리보기
+            preview = st.session_state.home_text[:120] or st.session_state.home_filename or ""
+            if preview:
+                st.markdown(
+                    f"<div style='background:#2a2a2a;border:1px solid #333;border-radius:8px;"
+                    f"padding:10px 14px;font-size:11px;color:#888;margin-bottom:16px'>"
+                    f"📄 입력 자료 미리보기: {preview}{'…' if len(preview)>=120 else ''}</div>",
+                    unsafe_allow_html=True,
+                )
+
+            st.markdown("**추천 분석 경로** — 클릭하여 선택하세요")
+
+            # 추천 단계 카드
+            sel = st.session_state.home_sel_stage
+            for rec in recs:
+                is_sel = (sel == rec["stage"])
+                border = "#2563eb" if is_sel else "#333"
+                bg     = "#1e2a3a" if is_sel else "#242424"
+                badge_col = {"🔴 필수":"#7f1d1d","🟠 권장":"#7c3a00","🟡 선택":"#713f12"}.get(rec["priority"],"#1e293b")
+                st.markdown(
+                    f"<div style='background:{bg};border:1.5px solid {border};"
+                    f"border-radius:10px;padding:14px 16px;margin-bottom:8px;"
+                    f"cursor:pointer;transition:all .15s'>"
+                    f"<div style='display:flex;align-items:center;gap:10px'>"
+                    f"<span style='font-size:22px'>{rec['icon']}</span>"
+                    f"<div style='flex:1'>"
+                    f"<div style='font-size:14px;font-weight:700'>{rec['label']}"
+                    f"{'  ✓' if is_sel else ''}</div>"
+                    f"<div style='font-size:11px;color:#888;margin-top:2px'>{rec['reason']}</div>"
+                    f"</div>"
+                    f"<span style='background:{badge_col};color:#e2e8f0;font-size:10px;"
+                    f"padding:3px 8px;border-radius:4px;font-weight:600'>{rec['priority']}</span>"
+                    f"</div></div>",
+                    unsafe_allow_html=True,
+                )
+                if st.button(f"이 단계 선택", key=f"sel_{rec['stage']}",
+                             type="primary" if is_sel else "secondary",
+                             use_container_width=False):
+                    st.session_state.home_sel_stage = rec["stage"]
+                    st.rerun()
+
+            # 직접 선택
+            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+            all_stages = [f"G{n} {STAGE_META[n][1]}" for n in range(11)]
+            custom = st.selectbox("또는 원하는 단계 직접 선택", ["— 추천 중에서 선택 —"] + all_stages,
+                                  key="step2_custom")
+            if custom != "— 추천 중에서 선택 —":
+                st.session_state.home_sel_stage = int(custom[1])
+
+            st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+            c_back, c_next = st.columns(2)
+            if c_back.button("← 뒤로", use_container_width=True, key="step2_back"):
+                st.session_state.home_step = 1; st.rerun()
+            if c_next.button("다음 — 추가 입력 →", type="primary",
+                              use_container_width=True, key="step2_next"):
+                if st.session_state.home_sel_stage is None:
+                    st.warning("분석할 단계를 선택해 주세요.")
+                else:
+                    st.session_state.home_step = 3; st.rerun()
+
+        # ════════════════════════════════
+        # STEP 3 — 추가 입력 · 실행 · 중단 리포팅
+        # ════════════════════════════════
+        elif step == 3:
+            sel_n   = st.session_state.home_sel_stage
+            sel_rec = next((r for r in st.session_state.home_rec_stages if r["stage"] == sel_n), None)
+            sel_label = sel_rec["label"] if sel_rec else f"G{sel_n}"
+            sel_icon  = sel_rec["icon"]  if sel_rec else "🔬"
+            name = st.session_state.tech_name or "기술"
+
+            st.markdown(
+                f"<div style='margin-bottom:20px'>"
+                f"<div style='font-size:22px;font-weight:700'>{sel_icon} {sel_label} 분석 준비</div>"
+                f"<div style='font-size:13px;color:#888;margin-top:4px'>"
+                f"<b style='color:#e2e8f0'>{name}</b> — 추가 자료를 보완하면 분석 품질이 높아집니다</div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+            # 기존 입력 요약
+            col_a, col_b = st.columns(2)
+            col_a.markdown(
+                f"<div style='background:#242424;border:1px solid #333;border-radius:8px;"
+                f"padding:10px 14px;font-size:11px'>"
+                f"<b>입력 자료</b><br>"
+                f"<span style='color:#888'>{(st.session_state.home_text[:80] + '…') if st.session_state.home_text else st.session_state.home_filename or '–'}</span>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+            col_b.markdown(
+                f"<div style='background:#242424;border:1px solid #333;border-radius:8px;"
+                f"padding:10px 14px;font-size:11px'>"
+                f"<b>선택 단계</b><br>"
+                f"<span style='color:#60a5fa'>{sel_icon} {sel_label}</span> · TRL {st.session_state.home_trl}"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+            st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+
+            # 단계별 추가 입력 필드
+            STAGE_EXTRA = {
+                0: ("기술 분류 / IPC 코드 (선택)", "예: A01G, G06N"),
+                1: ("선행특허 번호 또는 경쟁사 특허 (선택)", "예: KR10-2020-0123456, US10123456"),
+                2: ("개발 이력 / TRL 근거 자료 (선택)", "예: 2023 논문 게재, 시제품 제작 완료"),
+                3: ("목표 시장 국가 / 산업 섹터 (선택)", "예: 국내 온실 농가, 동남아 AgTech"),
+                4: ("인터뷰 대상 고객 유형 (선택)", "예: 중소 온실 농가, 대형 농업법인"),
+                5: ("수익 모델 / 가격 전략 (선택)", "예: SaaS 월 구독 200만원, 로열티 5%"),
+                6: ("매출 예측 데이터 (선택)", "예: 2025년 5억, 2026년 15억, 2027년 40억"),
+                7: ("PoC 대상 기업 / 기관 (선택)", "예: 넥스트팜, 그린플러스, KIST"),
+                8: ("인증 목표 국가 / 규격 (선택)", "예: CE, FDA 510(k), KC 인증"),
+                9: ("잠재 투자자 / 라이선시 (선택)", "예: 카카오벤처스, LG화학"),
+                10:("성과 지표 기준값 (선택)", "예: 매출 목표 50억, 고객 수 100개사"),
+            }
+            extra_label, extra_ph = STAGE_EXTRA.get(sel_n, ("추가 자료 (선택)", "관련 자료 입력"))
+            extra_text = st.text_area(
+                extra_label,
+                placeholder=extra_ph,
+                height=100,
+                value=st.session_state.home_extra,
+                key="step3_extra",
+            )
+
+            # 추가 파일
+            extra_file = st.file_uploader(
+                "보완 자료 파일 추가 (선택)",
+                type=["pdf","docx","txt","xlsx"],
+                key="step3_file",
+                label_visibility="visible",
+            )
+
+            st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+
+            # 버튼 3개
+            b_back, b_run, b_stop = st.columns([1, 2, 1])
+
+            if b_back.button("← 뒤로", use_container_width=True, key="step3_back"):
+                st.session_state.home_step = 2; st.rerun()
+
+            if b_run.button("🚀 분석 실행", type="primary",
+                             use_container_width=True, key="step3_run"):
+                st.session_state.home_extra = st.session_state.get("step3_extra","")
+                import time as _t
+                auto_id = f"TECH-{int(_t.time())%100000}"
+                st.session_state.tech_id     = auto_id
+                st.session_state.trl         = st.session_state.home_trl
+                st.session_state.stage_gates = {}
+                new_r = {"id": auto_id, "name": st.session_state.tech_name,
+                         "trl": st.session_state.home_trl, "icon": sel_icon}
+                st.session_state.recent_techs = [new_r] + st.session_state.recent_techs[:4]
+
+                # 단계별 이동
+                _PAGE_MAP = {0:"workspace",1:"ip_hub",2:"ip_hub",3:"ip_hub",
+                             4:"interviews",5:"bm",6:"valuation",
+                             7:"workspace",8:"workspace",9:"workspace",10:"kpi"}
+                st.session_state.page = _PAGE_MAP.get(sel_n, "workspace")
+                st.rerun()
+
+            if b_stop.button("⏸ 지금 리포팅", use_container_width=True, key="step3_stop"):
+                st.session_state.home_stopped = True
+
+            # 중간 중단 리포트
+            if st.session_state.home_stopped:
+                st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+                st.markdown("---")
+                st.subheader("📄 중간 리포트")
+                st.markdown(
+                    f"**기술명**: {st.session_state.tech_name}  \n"
+                    f"**TRL**: {st.session_state.home_trl}  \n"
+                    f"**선택 단계**: {sel_icon} {sel_label}  \n"
+                    f"**입력 자료 요약**: {st.session_state.home_text[:200] or st.session_state.home_filename or '–'}  \n"
+                    f"**추가 자료**: {extra_text or '–'}"
+                )
+                st.info(
+                    f"💡 **추천 경로 요약**\n\n"
+                    + "\n".join(
+                        f"- {r['icon']} {r['label']}: {r['reason']} ({r['priority']})"
+                        for r in st.session_state.home_rec_stages
+                    )
+                )
+                # 다운로드
+                report_txt = (
+                    f"IPInsight 중간 리포트\n"
+                    f"{'='*40}\n"
+                    f"기술명: {st.session_state.tech_name}\n"
+                    f"TRL: {st.session_state.home_trl}\n"
+                    f"선택 단계: {sel_label}\n"
+                    f"입력 자료:\n{st.session_state.home_text or st.session_state.home_filename}\n\n"
+                    f"추가 자료:\n{extra_text}\n\n"
+                    f"추천 분석 경로:\n"
+                    + "\n".join(f"- {r['label']}: {r['reason']}" for r in st.session_state.home_rec_stages)
+                )
+                st.download_button(
+                    "📥 중간 리포트 다운로드 (.txt)",
+                    data=report_txt.encode("utf-8"),
+                    file_name=f"ipinsight_report_{st.session_state.tech_name[:10]}.txt",
+                    mime="text/plain",
+                    use_container_width=True,
+                )
+                c1, c2 = st.columns(2)
+                if c1.button("▶ 분석 계속하기", use_container_width=True, type="primary"):
+                    st.session_state.home_stopped = False; st.rerun()
+                if c2.button("🔄 처음부터 다시", use_container_width=True):
+                    _home_reset()
 
 
 # ════════════════════════════════════════════════════════════════
