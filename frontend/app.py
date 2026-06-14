@@ -919,6 +919,60 @@ elif st.session_state.page == "workspace":
                 + (f" · {score:.0f}점" if gate != "미실행" else ""),
             )
 
+    # 3단 파이프라인 빠른 실행 (G1→G2→G3)
+    st.divider()
+    with st.expander("⚡ G1→G2→G3 연속 분석 (특허→PCML→SCR→시장성)", expanded=False):
+        st.caption("특허 텍스트 하나로 G1 PCML · G2 SCR · G3 시장성을 한 번에 분석합니다.")
+        pipeline_text = st.text_area(
+            "특허 텍스트 또는 기술 설명",
+            value=st.session_state.get("home_text", ""),
+            height=120,
+            key="ws_pipeline_text",
+            placeholder="청구항 또는 기술 요약을 붙여넣으세요…",
+        )
+        c_tam, c_grow, c_mkt = st.columns(3)
+        ws_tam   = c_tam.number_input("TAM (USD)", value=500_000_000, step=100_000_000, format="%d", key="ws_tam")
+        ws_grow  = c_grow.number_input("성장률 (%)", value=8.0, step=1.0, key="ws_grow")
+        ws_mkt   = c_mkt.text_input("목표 시장", value="글로벌 B2B 기술 라이선싱", key="ws_mkt")
+        if st.button("🚀 3단 파이프라인 실행", type="primary", key="ws_chain_run"):
+            if not pipeline_text.strip():
+                st.warning("특허 텍스트를 입력하세요.")
+            else:
+                with st.spinner("G1 PCML → G2 SCR → G3 시장성 분석 중…"):
+                    resp = api_post("/ip/analyze-chain-extended", {
+                        "patent_text": pipeline_text,
+                        "tech_id": st.session_state.tech_id or "WS-CHAIN",
+                        "tech_name": st.session_state.tech_name or "분석 기술",
+                        "tam_usd": ws_tam,
+                        "growth_rate_pct": ws_grow,
+                        "target_market": ws_mkt,
+                    })
+                if resp:
+                    chain = resp.get("chain", {})
+                    scores = resp.get("pipeline_scores", {})
+                    sc1, sc2, sc3, sc4 = st.columns(4)
+                    sc1.metric("PCML (G1)", f"{scores.get('pcml',0):.0f}점", chain.get('step2_pcml',{}).get('gate',''))
+                    sc2.metric("SCR (G2)", f"{scores.get('scr',0):.0f}점", chain.get('step3_scr',{}).get('gate',''))
+                    sc3.metric("시장성 (G3)", f"{scores.get('g3',0):.0f}점", chain.get('step4_g3',{}).get('gate',''))
+                    sc4.metric("종합 점수", f"{scores.get('composite',0):.0f}점", resp.get('overall_gate',''))
+                    # stage_gates 업데이트
+                    for stage_n, step_key in [(1,'step2_pcml'),(2,'step3_scr'),(3,'step4_g3')]:
+                        s = chain.get(step_key, {})
+                        if s.get('gate'):
+                            st.session_state.stage_gates[stage_n] = {
+                                "gate": s['gate'], "score": s['score']
+                            }
+                    st.session_state.last_result = {"gate": resp.get('overall_gate',''), "score": scores.get('composite',0), "next_actions": resp.get('next_steps',[])}
+                    st.session_state.last_stage  = 3
+                    # 다음 단계 안내
+                    next_steps = resp.get("next_steps", [])
+                    if next_steps:
+                        st.markdown("**권장 다음 단계:**")
+                        for ns in next_steps[:3]:
+                            st.markdown(f"- {ns}")
+                else:
+                    st.error("파이프라인 실행 실패 — API 서버 상태를 확인하세요.")
+
     # 마지막 결과 Gate 카드
     if st.session_state.last_result and st.session_state.last_stage is not None:
         st.divider()
