@@ -410,6 +410,213 @@ body[data-theme="cream"] .stButton > button:hover {
 body[data-theme="cream"] [data-testid="metric-container"] { background: rgba(255,255,255,.5) !important; border-color: rgba(0,0,0,.07) !important; }
 body[data-theme="cream"] [data-testid="stMetricValue"] { color: #1a0a00 !important; }
 body[data-theme="cream"] [data-testid="stMetricLabel"] { color: rgba(60,30,10,.4) !important; }
+
+/* ═══════════════════════════════════════════
+   IPInsight UI v2.1 — v0.dev 품질 강화 CSS
+   ══════════════════════════════════════════ */
+
+/* ── 사이드바 스테이지 게이트 강화 ── */
+.sb-stage { border: 1px solid transparent; transition: background .12s, border-color .12s; }
+.sb-stage:hover { background: rgba(255,255,255,.04) !important; border-color: rgba(255,255,255,.06); }
+.sb-stage.active { background: rgba(37,99,235,.12) !important; border-color: rgba(37,99,235,.22) !important; }
+.dot-go   { background: #4ade80 !important; box-shadow: 0 0 6px rgba(74,222,128,.6) !important; }
+.dot-hold { background: #fbbf24 !important; box-shadow: 0 0 6px rgba(251,191,36,.5) !important; }
+.dot-kill { background: #f87171 !important; box-shadow: 0 0 6px rgba(248,113,113,.5) !important; }
+.dot-idle { background: rgba(255,255,255,.12) !important; }
+
+/* ── BM Canvas 카드 ── */
+.bm-card {
+  background: #1a1d27;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 9px;
+  padding: 11px 13px;
+  min-height: 88px;
+  transition: border-color .14s, transform .1s, box-shadow .14s;
+}
+.bm-card:hover {
+  border-color: rgba(59,130,246,.3);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0,0,0,.3);
+}
+.bm-card.highlight {
+  border-color: rgba(59,130,246,.35);
+  background: rgba(37,99,235,.06);
+}
+.bm-card-hdr { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.bm-card-icon { font-size: 14px; }
+.bm-card-title { font-size: 9px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: .06em; }
+.bm-card-body { font-size: 10px; color: #64748b; line-height: 1.6; }
+.bm-tag {
+  display: inline-block; padding: 2px 7px;
+  background: rgba(59,130,246,.1); color: #60a5fa;
+  border: 1px solid rgba(59,130,246,.18);
+  border-radius: 4px; font-size: 9px; font-weight: 500;
+  margin: 2px 2px 0 0;
+}
+.bm-tag-green  { background: rgba(74,222,128,.08) !important; color: #4ade80 !important; border-color: rgba(74,222,128,.2) !important; }
+.bm-tag-yellow { background: rgba(251,191,36,.08) !important; color: #fbbf24 !important; border-color: rgba(251,191,36,.2) !important; }
+.bm-add { font-size: 9px; color: #334155; margin-top: 8px; cursor: pointer; border-top: 1px solid rgba(255,255,255,.04); padding-top: 6px; }
+
+/* ── 상단 Stage Rail v2 ── */
+.stage-rail-v2 {
+  display: flex; align-items: center;
+  padding: 9px 20px; overflow-x: auto;
+  background: #0d0f18; border-bottom: 1px solid rgba(255,255,255,.05);
+  gap: 0; scrollbar-width: none;
+}
+.stage-rail-v2::-webkit-scrollbar { display: none; }
+.sr-node { display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0; cursor: pointer; padding: 0 6px; }
+.sr-circle {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 8px; font-weight: 800; border: 1.5px solid;
+  transition: all .15s;
+}
+.sr-circle.go     { background: rgba(74,222,128,.12);  border-color: #4ade80; color: #4ade80; }
+.sr-circle.hold   { background: rgba(251,191,36,.1);   border-color: #fbbf24; color: #fbbf24; }
+.sr-circle.kill   { background: rgba(248,113,113,.1);  border-color: #f87171; color: #f87171; }
+.sr-circle.active { background: rgba(59,130,246,.18);  border-color: #3b82f6; color: #93c5fd; box-shadow: 0 0 12px rgba(59,130,246,.35); }
+.sr-circle.idle   { background: rgba(255,255,255,.03); border-color: rgba(255,255,255,.1); color: #475569; }
+.sr-text { font-size: 7px; color: #334155; white-space: nowrap; }
+.sr-node.active .sr-text { color: #60a5fa; font-weight: 700; }
+.sr-node.go .sr-text { color: #4ade80; }
+.sr-connector { flex: 1; height: 1px; background: rgba(255,255,255,.06); min-width: 8px; max-width: 22px; margin-bottom: 11px; }
+
+/* ── Context Banner v2 ── */
+.ctx-banner-v2 {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 20px; background: #111420;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+  flex-wrap: wrap;
+}
+.ctx-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 99px;
+  font-size: 9px; font-weight: 700; line-height: 1;
+}
+.ctx-chip-blue   { background: rgba(59,130,246,.12); color: #60a5fa; border: 1px solid rgba(59,130,246,.22); }
+.ctx-chip-green  { background: rgba(74,222,128,.1);  color: #4ade80; border: 1px solid rgba(74,222,128,.2); }
+.ctx-chip-yellow { background: rgba(251,191,36,.1);  color: #fbbf24; border: 1px solid rgba(251,191,36,.2); }
+.ctx-chip-gray   { background: rgba(255,255,255,.06); color: #94a3b8; border: 1px solid rgba(255,255,255,.08); }
+.ctx-tech-name   { font-size: 12px; font-weight: 600; color: #e2e8f0; }
+
+/* ── Gate 결과 카드 v2 ── */
+.gate-card-v2 {
+  background: #1a1d27; border-radius: 10px;
+  padding: 14px 18px; display: flex; align-items: center;
+  justify-content: space-between; margin-top: 14px;
+}
+.gate-card-v2.go   { border: 1px solid rgba(74,222,128,.25); }
+.gate-card-v2.hold { border: 1px solid rgba(251,191,36,.25); }
+.gate-card-v2.kill { border: 1px solid rgba(248,113,113,.25); }
+.gate-v2-score { font-size: 30px; font-weight: 800; letter-spacing: -1.5px; }
+.gate-v2-score.go   { color: #4ade80; }
+.gate-v2-score.hold { color: #fbbf24; }
+.gate-v2-score.kill { color: #f87171; }
+.gate-v2-label { font-size: 13px; font-weight: 700; }
+.gate-v2-label.go   { color: #4ade80; }
+.gate-v2-label.hold { color: #fbbf24; }
+.gate-v2-label.kill { color: #f87171; }
+.gate-v2-sub { font-size: 10px; color: #475569; margin-top: 2px; }
+
+/* ── KPI 카드 v2 ── */
+.kpi-v2 {
+  background: #1a1d27; border: 1px solid rgba(255,255,255,.07);
+  border-radius: 10px; padding: 14px 16px;
+  transition: border-color .15s, transform .1s;
+}
+.kpi-v2:hover { border-color: rgba(255,255,255,.14); transform: translateY(-1px); }
+.kpi-v2-label { font-size: 9px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 6px; }
+.kpi-v2-value { font-size: 26px; font-weight: 800; color: #f1f5f9; letter-spacing: -.8px; line-height: 1; }
+.kpi-v2-delta { font-size: 10px; color: #64748b; margin-top: 4px; }
+.kpi-v2-delta.up   { color: #4ade80; }
+.kpi-v2-delta.down { color: #f87171; }
+
+/* ── 탭 강화 ── */
+[data-testid="stTabs"] [data-baseweb="tab-list"] {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(255,255,255,.06) !important;
+  gap: 2px !important;
+}
+[data-testid="stTabs"] [data-baseweb="tab"] {
+  background: transparent !important;
+  border-radius: 7px 7px 0 0 !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: #64748b !important;
+  padding: 8px 16px !important;
+  transition: all .12s !important;
+}
+[data-testid="stTabs"] [aria-selected="true"] {
+  color: #e2e8f0 !important;
+  background: rgba(59,130,246,.07) !important;
+  border-bottom: 2px solid #3b82f6 !important;
+}
+
+/* ── 텍스트 입력 강화 ── */
+[data-testid="stTextInput"] input,
+[data-testid="stTextArea"] textarea,
+[data-testid="stNumberInput"] input {
+  background: #1a1d27 !important;
+  border: 1px solid rgba(255,255,255,.09) !important;
+  border-radius: 7px !important;
+  color: #e2e8f0 !important;
+  font-size: 12px !important;
+}
+[data-testid="stTextInput"] input:focus,
+[data-testid="stTextArea"] textarea:focus {
+  border-color: rgba(59,130,246,.45) !important;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.1) !important;
+}
+
+/* ── Expander 강화 ── */
+[data-testid="stExpander"] {
+  background: #1a1d27 !important;
+  border: 1px solid rgba(255,255,255,.07) !important;
+  border-radius: 9px !important;
+}
+
+/* ── 섹션 헤더 강화 ── */
+.sec-header-v2 {
+  font-size: 11px; font-weight: 700; color: #475569;
+  text-transform: uppercase; letter-spacing: .08em;
+  display: flex; align-items: center; gap: 8px;
+  margin: 16px 0 10px;
+}
+.sec-header-v2::after { content:''; flex:1; height:1px; background: rgba(255,255,255,.05); }
+
+/* ── 인라인 상태 카드 ── */
+.info-card  { background: rgba(59,130,246,.07); border: 1px solid rgba(59,130,246,.18); border-radius: 8px; padding: 10px 14px; font-size: 11px; color: #93c5fd; margin: 8px 0; }
+.warn-card  { background: rgba(251,191,36,.07);  border: 1px solid rgba(251,191,36,.2);  border-radius: 8px; padding: 10px 14px; font-size: 11px; color: #fcd34d; margin: 8px 0; }
+.ok-card    { background: rgba(74,222,128,.07);  border: 1px solid rgba(74,222,128,.2);  border-radius: 8px; padding: 10px 14px; font-size: 11px; color: #86efac; margin: 8px 0; }
+
+/* ── 헤딩 강화 ── */
+[data-testid="stHeadingContainer"] h1 {
+  font-size: 22px !important; font-weight: 800 !important;
+  color: #f1f5f9 !important; letter-spacing: -.5px !important;
+  border-bottom: 1px solid rgba(255,255,255,.06) !important;
+  padding-bottom: 10px !important; margin-bottom: 8px !important;
+}
+[data-testid="stHeadingContainer"] h2 { font-size: 16px !important; font-weight: 700 !important; color: #e2e8f0 !important; letter-spacing: -.2px !important; }
+[data-testid="stHeadingContainer"] h3 { font-size: 13px !important; font-weight: 700 !important; color: #cbd5e1 !important; }
+[data-testid="stCaptionContainer"] p  { font-size: 11px !important; color: #475569 !important; }
+
+/* ── 메인 배경 v2 ── */
+.stApp { background: #0b0d14 !important; }
+body[data-theme="black"] .stApp { background: #030303 !important; }
+body[data-theme="cream"] .stApp { background: #faf6f0 !important; }
+body[data-theme="cream"] [data-testid="stHeadingContainer"] h1 { color: #1a0a00 !important; border-color: rgba(0,0,0,.08) !important; }
+
+/* ── Home hero 타이틀 강화 ── */
+.home-title {
+  font-size: 38px !important; font-weight: 800 !important; letter-spacing: -2px !important;
+  background: linear-gradient(135deg, #f1f5f9 20%, #60a5fa 60%, #a78bfa 100%) !important;
+  -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important;
+}
+
+/* ── 구분선 ── */
+[data-testid="stDivider"] hr { border-color: rgba(255,255,255,.06) !important; }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -484,62 +691,133 @@ def api_post(path: str, body: dict, silent: bool = False) -> dict | None:
 
 # ── 공통 컴포넌트 ─────────────────────────────────────────────────
 
-def render_stage_bar(current: int | None = None):
-    """G0~G10 진행 표시줄 — 전 화면 공통 렌더링"""
+def render_stage_bar(current: int | None = None, show_toolbar: bool = True):
+    """G0~G10 Stage Rail v2 — 전 화면 공통 렌더링"""
     gates = st.session_state.stage_gates
-    html = '<div class="stage-bar">'
+    html = '<div class="stage-rail-v2">'
     for n, (gid, name, icon) in STAGE_META.items():
         info = gates.get(n, {})
         gate = info.get("gate", "")
         if gate == "Kill":
-            cls = "stage-kill"
-        elif gate in ("Go", "Hold"):
-            cls = "stage-done"
+            circle_cls = "kill"
+            node_cls   = "kill"
+        elif gate == "Go":
+            circle_cls = "go"
+            node_cls   = "go"
+        elif gate == "Hold":
+            circle_cls = "hold"
+            node_cls   = ""
         elif n == current:
-            cls = "stage-active"
+            circle_cls = "active"
+            node_cls   = "active"
         else:
-            cls = "stage-locked"
-        score_txt = f"({info['score']:.0f})" if info.get("score") else ""
-        html += f'''
-        <div class="stage-node {cls}">
-          <div class="stage-circle">{icon}</div>
-          <div class="stage-label">{gid}<br>{name}<br><span style="color:#60a5fa;font-size:8px">{score_txt}</span></div>
-        </div>'''
+            circle_cls = "idle"
+            node_cls   = ""
+        score_txt = f"{info['score']:.0f}" if info.get("score") else gid
+        html += f'<div class="sr-node {node_cls}" title="{name}">'
+        html += f'<div class="sr-circle {circle_cls}">{score_txt}</div>'
+        html += f'<div class="sr-text">{icon} {name}</div>'
+        html += '</div>'
         if n < 10:
-            html += '<div class="stage-connector"></div>'
+            html += '<div class="sr-connector"></div>'
     html += "</div>"
     st.markdown(html, unsafe_allow_html=True)
+    if show_toolbar and current is not None:
+        render_quick_toolbar(current)
 
 
 def render_context_banner():
-    """현재 기술 컨텍스트 배너 — 1회 입력 원칙"""
-    tid = st.session_state.tech_id
-    tname = st.session_state.tech_name
-    trl = st.session_state.trl
-    completed = sum(1 for g in st.session_state.stage_gates.values() if g.get("gate") == "Go")
+    """현재 기술 컨텍스트 배너 v2 — chip 스타일"""
+    tid       = st.session_state.tech_id
+    tname     = st.session_state.tech_name
+    trl       = st.session_state.trl
+    gates     = st.session_state.stage_gates
+    completed = sum(1 for g in gates.values() if g.get("gate") == "Go")
+    kills     = sum(1 for g in gates.values() if g.get("gate") == "Kill")
+    holds     = sum(1 for g in gates.values() if g.get("gate") == "Hold")
+
+    # TRL 색상
+    trl_cls = "ctx-chip-green" if trl >= 7 else ("ctx-chip-yellow" if trl >= 4 else "ctx-chip-gray")
+    # 전체 리스크 표시
+    risk_cls  = "ctx-chip-yellow" if kills > 0 else "ctx-chip-green" if completed >= 3 else "ctx-chip-gray"
+    risk_lbl  = f"⛔ Kill {kills}" if kills > 0 else (f"✅ Go {completed}" if completed > 0 else "🔵 진행 중")
+
+    hold_html = f'<span class="ctx-chip ctx-chip-yellow">⏸ Hold {holds}</span>' if holds > 0 else ""
     st.markdown(
-        f'<div class="ctx-banner">🔬 <strong>{tname}</strong>'
-        f'&nbsp;·&nbsp;<code>{tid}</code>'
-        f'&nbsp;·&nbsp;TRL {trl}'
-        f'&nbsp;·&nbsp;완료 단계 {completed}/11</div>',
+        f'<div class="ctx-banner-v2">'
+        f'<span class="ctx-chip ctx-chip-blue">🔬 {tid}</span>'
+        f'<span class="ctx-tech-name">{tname}</span>'
+        f'<span class="ctx-chip {trl_cls}">TRL {trl}</span>'
+        f'<span class="ctx-chip ctx-chip-gray">완료 {completed}/11</span>'
+        f'<span class="ctx-chip {risk_cls}">{risk_lbl}</span>'
+        f'{hold_html}'
+        f'</div>',
         unsafe_allow_html=True,
     )
 
 
 def render_gate_card(gate: str, score: float, stage_label: str, next_actions: list[str]):
-    """Gate 판정 → 다음 행동 카드"""
-    meta = GATE_NEXT.get(gate, GATE_NEXT["Hold"])
-    css  = {"Go": "gate-go", "Hold": "gate-hold", "Kill": "gate-kill"}.get(gate, "gate-hold")
-    actions_html = "".join(f"<li>{a}</li>" for a in next_actions[:3])
+    """Gate 판정 → 다음 행동 카드 (v2.1 스타일)"""
+    meta     = GATE_NEXT.get(gate, GATE_NEXT["Hold"])
+    gate_cls = gate.lower() if gate in ("Go","Hold","Kill") else "hold"
+    actions_html = "".join(f"<li style='margin-bottom:3px'>{a}</li>" for a in next_actions[:3])
     st.markdown(f"""
-    <div class="gate-card {css}">
-      <div style="font-size:15px;font-weight:700;margin-bottom:6px;">
-        {meta['icon']} {stage_label} — {meta['label']} &nbsp;
-        <span style="font-size:12px;font-weight:400;opacity:.7">점수 {score:.1f}</span>
+    <div class="gate-card-v2 {gate_cls}">
+      <div>
+        <div class="gate-v2-label {gate_cls}">{meta['icon']} {stage_label} — {meta['label']}</div>
+        <div class="gate-v2-sub">다음 단계 권장 행동</div>
+        <ul style="margin:8px 0 0;padding-left:18px;font-size:11px;color:#64748b">{actions_html}</ul>
       </div>
-      <ul style="margin:0;padding-left:18px;font-size:12px;opacity:.85">{actions_html}</ul>
+      <div class="gate-v2-score {gate_cls}">{score:.0f}</div>
     </div>
     """, unsafe_allow_html=True)
+
+
+# ── Quick Action Toolbar (Wellspring/Anaqua 스타일) ──────────────────
+_STAGE_ACTIONS: dict[int, list[tuple[str, str, str]]] = {
+    0:  [("🔍", "특허 검색",       "g1"),  ("📋", "IP 구조화",   "g1"),  ("🧪", "기술성 평가",  "g2")],
+    1:  [("🧪", "기술성 평가",     "g2"),  ("🌐", "시장성 평가", "g3"),  ("📊", "클레임 분석",  "g1")],
+    2:  [("🌐", "시장성 평가",     "g3"),  ("🤝", "고객 검증",   "g4"),  ("💼", "사업화전략",   "g5")],
+    3:  [("🤝", "고객 검증",       "g4"),  ("💼", "사업화전략",  "g5"),  ("💰", "가치평가",     "g6")],
+    4:  [("💼", "사업화전략",      "g5"),  ("💰", "가치평가",    "g6"),  ("🔬", "PoC 실증",     "g7")],
+    5:  [("💰", "가치평가",        "g6"),  ("🔬", "PoC 실증",    "g7"),  ("📊", "PoB/MRL",      "g8")],
+    6:  [("🔬", "PoC 실증",        "g7"),  ("📊", "PoB/MRL",     "g8"),  ("🤝", "거래·투자",    "g9")],
+    7:  [("📊", "PoB/MRL",         "g8"),  ("🤝", "거래·투자",   "g9"),  ("📈", "성과관리",     "g10")],
+    8:  [("🤝", "거래·투자",       "g9"),  ("📈", "성과관리",    "g10"), ("📄", "보고서",        "reports")],
+    9:  [("📈", "성과관리",        "g10"), ("📄", "보고서",      "reports"),("🏠","워크스페이스","workspace")],
+    10: [("📄", "보고서 생성",     "reports"), ("🏠", "워크스페이스", "workspace"), ("🔭", "신기술 발굴", "g0")],
+}
+
+
+def render_quick_toolbar(current_stage: int):
+    """현재 스테이지 기반 다음 권장 액션 툴바 (Wellspring 스타일)"""
+    actions = _STAGE_ACTIONS.get(current_stage, [])
+    if not actions:
+        return
+    gate_info = st.session_state.stage_gates.get(current_stage, {})
+    gate      = gate_info.get("gate", "")
+
+    # Gate=Go 이면 다음 단계로 이동 CTA 강조
+    label = "다음 권장 단계" if gate == "Go" else "관련 기능"
+    chips = "".join(
+        f'<span class="ctx-chip ctx-chip-{"blue" if i == 0 and gate == "Go" else "gray"}" '
+        f'style="cursor:pointer;margin:2px">{ico} {name}</span>'
+        for i, (ico, name, _) in enumerate(actions[:4])
+    )
+    st.markdown(
+        f'<div style="display:flex;align-items:center;gap:8px;padding:7px 0 10px;'
+        f'border-bottom:1px solid rgba(255,255,255,.05);margin-bottom:12px">'
+        f'<span style="font-size:10px;color:#334155;font-weight:700">{label}</span>'
+        f'{chips}</div>',
+        unsafe_allow_html=True,
+    )
+    # 버튼 클릭 연동 (Streamlit 방식)
+    cols = st.columns(len(actions[:4]))
+    for i, (ico, name, page) in enumerate(actions[:4]):
+        with cols[i]:
+            if st.button(f"{ico} {name}", key=f"qa_{current_stage}_{i}", use_container_width=True):
+                st.session_state.page = page
+                st.rerun()
 
 
 def _save_gate(stage_num: int, result: dict):
@@ -2561,25 +2839,31 @@ elif st.session_state.page in ("g5", "bm"):  # bm 하위호환
                     for col, title, key in positions:
                         items = canvas.get(key, [])
                         items = items if isinstance(items, list) else [items]
+                        tags_html = "".join(
+                            f"<span class='bm-tag'>{i}</span>" for i in items[:4]
+                        )
                         col.markdown(
-                            f"<div class='bm-block'><div class='bm-title'>{title}</div>"
-                            + "".join(f"<div style='font-size:11px;margin:2px 0'>• {i}</div>"
-                                      for i in items[:3])
-                            + "</div>",
+                            f"<div class='bm-card'>"
+                            f"<div class='bm-card-hdr'><span class='bm-card-title'>{title}</span></div>"
+                            f"<div>{tags_html}</div>"
+                            f"</div>",
                             unsafe_allow_html=True,
                         )
                     c_cost, c_rev = st.columns(2)
-                    for col, title, key in [
-                        (c_cost,"비용 구조","cost_structure"),
-                        (c_rev, "수익 흐름","revenue_streams"),
+                    for col, title, key, tag_cls in [
+                        (c_cost,"💸 비용 구조","cost_structure","bm-tag-yellow"),
+                        (c_rev, "💰 수익 흐름","revenue_streams","bm-tag-green"),
                     ]:
                         items = canvas.get(key, [])
                         items = items if isinstance(items, list) else [items]
+                        tags_html = "".join(
+                            f"<span class='bm-tag {tag_cls}'>{i}</span>" for i in items[:4]
+                        )
                         col.markdown(
-                            f"<div class='bm-block'><div class='bm-title'>{title}</div>"
-                            + "".join(f"<div style='font-size:11px;margin:2px 0'>• {i}</div>"
-                                      for i in items[:3])
-                            + "</div>",
+                            f"<div class='bm-card highlight'>"
+                            f"<div class='bm-card-hdr'><span class='bm-card-title'>{title}</span></div>"
+                            f"<div>{tags_html}</div>"
+                            f"</div>",
                             unsafe_allow_html=True,
                         )
                 if out.get("smk_triggered"):

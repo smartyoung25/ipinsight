@@ -10,6 +10,30 @@ from typing import Any
 # 프로젝트 루트를 Python 경로에 추가
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# .env 자동 로드 (python-dotenv 있으면 사용, 없으면 직접 파싱)
+def _load_dotenv():
+    env_path = Path(__file__).parent.parent / ".env"
+    if not env_path.exists():
+        return
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(env_path, override=False)
+        return
+    except ImportError:
+        pass
+    with open(env_path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, _, v = line.partition("=")
+            k = k.strip()
+            v = v.strip().strip('"').strip("'")
+            if k and k not in os.environ:
+                os.environ[k] = v
+
+_load_dotenv()
+
 from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Request
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -336,29 +360,34 @@ def run_pcml_analysis(req: PCMLRequest, _: dict = Depends(require_auth)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     out = result.output_doc
-    # KPI 연계 입력값 자동 추출
     kpi_inputs = agent.extract_kpi_inputs(out)
     return {
         "tech_id": req.tech_id,
         "stage": "G1.5-PCML",
-        "pcml_version": "2.0",
+        "pcml_version": "3.0",
         "gate": result.gate,
         "score": result.score,
-        # ── v2.0 6계층 ─────────────────────
-        "patent_layer": out.get("patent_layer", {}),
-        "claim_graph_layer": out.get("claim_graph_layer", {}),
-        "support_layer": out.get("support_layer", []),
-        "metadata_layer": out.get("metadata_layer", []),
-        "legal_family_layer": out.get("legal_family_layer", {}),
-        "evidence_layer": out.get("evidence_layer", []),
-        "shared_variables": out.get("shared_variables", {}),
-        "governance": out.get("governance", {}),
-        "qc": out.get("qc", {}),
-        "analysis_limits": out.get("analysis_limits", []),
-        "next_actions": out.get("next_actions", result.next_actions),
-        # ── 기술사업화 KPI 연계 ─────────────
+        # ── v3.0 4도메인 계층 ──────────────
+        "tech_graph_layer":       out.get("tech_graph_layer", {}),
+        "market_graph_layer":     out.get("market_graph_layer", {}),
+        "business_graph_layer":   out.get("business_graph_layer", {}),
+        "regulatory_graph_layer": out.get("regulatory_graph_layer", {}),
+        "cross_domain_links":     out.get("cross_domain_links", []),
+        # ── 공통 계층 ──────────────────────
+        "support_layer":     out.get("support_layer", []),
+        "metadata_layer":    out.get("metadata_layer", {}),
+        "legal_family_layer":out.get("legal_family_layer", {}),
+        "evidence_layer":    out.get("evidence_layer", []),
+        "shared_variables":  out.get("shared_variables", {}),
+        "governance":        out.get("governance", {}),
+        "qc":                out.get("qc", {}),
+        "analysis_limits":   out.get("analysis_limits", []),
+        "next_actions":      out.get("next_actions", result.next_actions),
+        # ── v2 호환 (screening_agent 등이 claim_graph_layer 참조) ──
+        "claim_graph_layer": out.get("claim_graph_layer") or
+                             out.get("tech_graph_layer", {}),
+        # ── KPI 연계 & 요약 ────────────────
         "kpi_inputs": kpi_inputs,
-        # ── 사람용 요약 (LLM 모드에서만) ───
         "summary": out.get("_part_a_summary") or out.get("_summary", ""),
     }
 

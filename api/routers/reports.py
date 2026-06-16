@@ -27,8 +27,15 @@ from api.report_deps import (
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
-# 인메모리 보고서 저장소 (운영환경에서는 DB로 교체)
+# 인메모리 보고서 저장소 (빠른 조회용, DB가 영속 저장)
 _report_store: dict[str, dict[str, Any]] = {}
+
+from api.services.report_pipeline import (
+    build_store_a_from_pcml, build_store_b_from_scr, build_store_d_from_context,
+    recommend_reports, generate_report_content,
+    save_report, list_reports, get_report_by_db_id, get_latest_report,
+    save_pipeline_run, list_pipeline_runs, REPORT_META,
+)
 
 
 # ─── 요청/응답 스키마 ─────────────────────────────────
@@ -316,3 +323,148 @@ def get_report_definitions(_: dict = Depends(require_auth)):
         }
         for rid, defn in REPORT_DEFS.items()
     }
+
+
+# ─── 파이프라인 통합 엔드포인트 ──────────────────────────────────
+
+class PipelineReportRequest(BaseModel):
+    tech_id:    str   = Field(..., description="기술 ID")
+    tech_name:  str   = Field("", description="기술명")
+    input_text: str   = Field("", description="특허/기술 텍스트")
+    trl:        int   = Field(4,  description="TRL 단계")
+    report_ids: list[str] = Field(default_factory=list, description="생성할 보고서 목록 (빈 목록=추천 기반 자동)")
+    tier:       str   = Field("LITE", description="FREE | LITE | FULL")
+    store_a:    dict  = Field(default_factory=dict, description="PCML 결과 (없으면 자동 생성)")
+    store_b:    dict  = Field(default_factory=dict, description="SCR 결과  (없으면 자동 생성)")
+    extra:      dict  = Field(default_factory=dict, description="TAM/SAM/SOM 등 추가 컨텍스트")
+
+
+@router.post("/pipeline", summary="분석→보고서 일괄 파이프라인")
+def run_report_pipeline(req: PipelineReportRequest, _: dict = Depends(require_auth)):
+    """
+    1. PCML/SCR 결과가 없으면 입력 텍스트로 자동 분석
+    2. 보고서 목록이 없으면 AI 추천
+    3. 선택 보고서 생성 + SQLite 저장
+    4. 전체 결과 반환
+    """
+    import time as _time
+
+    # Step1: StoreA/B 구성
+    store_a = req.store_a or {}
+    store_b = req.store_b or {}
+
+    if not store_a and req.input_text:
+        # 간이 PCML 폴백 (실제 에이전트 없을 때)
+        store_a = {
+            "release_status": "internal_only",
+            "pcml_score": 50,
+            "claim_count": 0,
+            "components": [],
+            "strengths": ["텍스트 기반 분석"],
+            "weaknesses": ["상세 PCML 분석 미수행"],
+            "_version": int(_time.time()),
+            "_source": "fallback",
+        }
+
+    if not store_b and req.input_text:
+        store_b = {
+            "gate": "Hold",
+            "scr_score": 50,
+            "white_space": [],
+            "competitor_landscape": {"majorPlayers": []},
+            "risk_factors": [],
+            "_version": int(_time.time()),
+            "_source": "fallback",
+        }
+
+    store_d = build_store_d_from_context(req.tech_name, req.trl, req.extra)
+
+    # Step2: 보고서 추천
+    recs = recommend_reports(store_a, store_b, req.trl)
+    if req.report_ids:
+        target_ids = req.report_ids
+    else:
+        target_ids = [r["id"] for r in recs[:3]]  # 기본 상위 3개
+
+    # Step3: 보고서 생성 + 저장
+    generated = []
+    for rid in target_ids:
+        content = generate_report_content(
+            report_id=rid, tech_id=req.tech_id, tier=req.tier,
+            store_a=store_a, store_b=store_b, store_d=store_d,
+        )
+        db_id = save_report(
+            tech_id=req.tech_id, report_id=rid, tier=req.tier,
+            content=content,
+            pcml_score=store_a.get("pcml_score", 0),
+            scr_score=store_b.get("scr_score", 0),
+        )
+        meta = REPORT_META.get(rid, {})
+        generated.append({
+            "db_id":      db_id,
+            "report_id":  rid,
+            "label":      meta.get("label", rid),
+            "icon":       meta.get("icon", "📄"),
+            "tier":       req.tier,
+            "key_findings": content.get("keyFindings", []),
+            "content_preview": (content.get("content", "")[:300] + "…"),
+            "fallback":   content.get("_fallback", False),
+        })
+        # 인메모리에도 캐시
+        _report_store[f"{req.tech_id}:{rid}"] = {**content, "status": "completed"}
+
+    # Step4: 파이프라인 실행 기록
+    run_id = save_pipeline_run(
+        tech_id=req.tech_id, tech_name=req.tech_name,
+        input_text=req.input_text[:500], trl=req.trl,
+        store_a=store_a, store_b=store_b,
+        reports=[r["report_id"] for r in generated],
+    )
+
+    return {
+        "run_id":      run_id,
+        "tech_id":     req.tech_id,
+        "tech_name":   req.tech_name,
+        "trl":         req.trl,
+        "recommended": recs,
+        "generated":   generated,
+        "store_a_summary": {
+            "pcml_score": store_a.get("pcml_score"),
+            "release_status": store_a.get("release_status"),
+            "source": store_a.get("_source", "provided"),
+        },
+        "store_b_summary": {
+            "gate": store_b.get("gate"),
+            "scr_score": store_b.get("scr_score"),
+            "source": store_b.get("_source", "provided"),
+        },
+    }
+
+
+@router.get("/db/list", summary="저장된 보고서 목록 조회")
+def list_saved_reports(tech_id: str = "", _: dict = Depends(require_auth)):
+    return list_reports(tech_id or None)
+
+
+@router.get("/db/{db_id}", summary="DB 보고서 단건 조회")
+def get_saved_report(db_id: str, _: dict = Depends(require_auth)):
+    r = get_report_by_db_id(db_id)
+    if not r:
+        raise HTTPException(status_code=404, detail="보고서 없음")
+    return r
+
+
+@router.get("/runs/list", summary="파이프라인 실행 이력")
+def list_runs(tech_id: str = "", _: dict = Depends(require_auth)):
+    return list_pipeline_runs(tech_id or None)
+
+
+@router.get("/recommend", summary="입력 기반 보고서 추천")
+def recommend(
+    pcml_score: float = 50, scr_score: float = 50,
+    gate: str = "Hold", trl: int = 4,
+    _: dict = Depends(require_auth),
+):
+    store_a = {"pcml_score": pcml_score}
+    store_b = {"scr_score": scr_score, "gate": gate}
+    return recommend_reports(store_a, store_b, trl)
