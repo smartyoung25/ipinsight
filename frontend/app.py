@@ -2478,8 +2478,8 @@ elif st.session_state.page == "workspace":
 
         # 3단 파이프라인 빠른 실행
         st.divider()
-        with st.expander("⚡ G1→G2→G3 연속 분석", expanded=False):
-            st.caption("특허 텍스트 하나로 G1 PCML · G2 SCR · G3 시장성을 한 번에 분석합니다.")
+        with st.expander("⚡ Cross-Stage 빠른 진입 (G1+G2+G3 동시 분석)", expanded=False):
+            st.caption("📌 단축 진입점 — 특허 텍스트 하나로 G1 PCML · G2 SCR · G3 시장성을 한 번에 분석합니다. 개별 G-Stage 페이지에서 심층 분석을 추가할 수 있습니다.")
             pipeline_text = st.text_area("특허 텍스트 또는 기술 설명",
                 value=st.session_state.get("home_text", ""), height=110,
                 key="ws_pipeline_text", placeholder="청구항 또는 기술 요약을 붙여넣으세요…")
@@ -2656,7 +2656,7 @@ elif st.session_state.page == "workspace":
 # ════════════════════════════════════════════════════════════════
 # G1 — IP 구조화 (PCML v3.0 + SCR 체인 통합)
 # ════════════════════════════════════════════════════════════════
-elif st.session_state.page in ("g1", "ip_hub"):  # ip_hub 하위호환
+elif st.session_state.page == "g1":
     _health_ip = api_get("/health", silent=True)
     _api_ok_ip = _health_ip is not None
     theme = st.session_state.get("theme", "dark"); bg_on = st.session_state.get("bg_on", True)
@@ -3042,7 +3042,7 @@ elif st.session_state.page in ("g1", "ip_hub"):  # ip_hub 하위호환
 # ════════════════════════════════════════════════════════════════
 # S04 — G4 인터뷰 보드 (칸반 + JTBD + LoI)
 # ════════════════════════════════════════════════════════════════
-elif st.session_state.page in ("g4", "interviews"):
+elif st.session_state.page == "g4":
     _h = api_get("/health", silent=True); _aok = _h is not None
     _th = st.session_state.get("theme","dark"); _bg = st.session_state.get("bg_on",True)
     st.markdown(f"<script>document.body.setAttribute('data-theme','{_th}');document.body.classList.{'add' if _bg else 'remove'}('bg-on');</script>", unsafe_allow_html=True)
@@ -3182,7 +3182,7 @@ elif st.session_state.page in ("g4", "interviews"):
 # ════════════════════════════════════════════════════════════════
 # G5 — 사업화전략 (BM Canvas + GTM + Unit Economics + SMK + 로드맵)
 # ════════════════════════════════════════════════════════════════
-elif st.session_state.page in ("g5", "bm"):  # bm 하위호환
+elif st.session_state.page == "g5":
     _h = api_get("/health", silent=True); _aok = _h is not None
     _th = st.session_state.get("theme","dark"); _bg = st.session_state.get("bg_on",True)
     st.markdown(f"<script>document.body.setAttribute('data-theme','{_th}');document.body.classList.{'add' if _bg else 'remove'}('bg-on');</script>", unsafe_allow_html=True)
@@ -3359,7 +3359,7 @@ elif st.session_state.page in ("g5", "bm"):  # bm 하위호환
 # ════════════════════════════════════════════════════════════════
 # G6 — 가치평가 (DCF / CCA / ROA)
 # ════════════════════════════════════════════════════════════════
-elif st.session_state.page in ("g6", "valuation"):  # valuation 하위호환
+elif st.session_state.page == "g6":
     _h = api_get("/health", silent=True); _aok = _h is not None
     _th = st.session_state.get("theme","dark"); _bg = st.session_state.get("bg_on",True)
     st.markdown(f"<script>document.body.setAttribute('data-theme','{_th}');document.body.classList.{'add' if _bg else 'remove'}('bg-on');</script>", unsafe_allow_html=True)
@@ -3369,42 +3369,162 @@ elif st.session_state.page in ("g6", "valuation"):  # valuation 하위호환
     st.title("💰 G6 기술 가치평가")
     render_stage_bar(current=6)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        method   = st.selectbox("평가 방법", ["dcf", "cca", "roa"])
-        discount = st.slider("할인율 (%)", 5, 40, 15) / 100
-        royalty  = st.slider("로열티율 (%)", 1, 20, 5) / 100
-    with col2:
+    tab_dcf, tab_cca, tab_roa, tab_compare = st.tabs(["📈 DCF 수익접근법", "🏪 CCA 시장접근법", "⚙️ ROA 실물옵션", "🔀 방법론 비교"])
+
+    def _g6_revenue_inputs(suffix: str):
         st.subheader("연도별 매출 예측 (USD)")
         revenues = {}
-        for y in range(2025, 2030):
-            revenues[str(y)] = st.number_input(
-                f"{y}년", min_value=0, value=int(1e6*(y-2024)), step=100_000, key=f"rev_{y}")
+        cols_r = st.columns(5)
+        for i, y in enumerate(range(2025, 2030)):
+            revenues[str(y)] = cols_r[i].number_input(
+                f"{y}", min_value=0, value=int(1e6*(y-2024)), step=100_000, key=f"rev_{suffix}_{y}")
+        return revenues
 
-    if st.button("▶ 가치평가 실행", type="primary"):
-        with st.spinner("가치평가 중..."):
-            result = api_post("/valuation/dcf", {
-                "tech_id": st.session_state.tech_id,
-                "revenue_forecast": revenues,
-                "discount_rate": discount,
-                "royalty_rate": royalty,
-                "method": method,
-            })
-        if result:
-            _save_gate(6, result)
-            out = result.get("output_doc", result)
+    with tab_dcf:
+        st.markdown('<div class="info-card">💡 미래 현금흐름을 할인율로 현재가치화합니다. 수익성이 명확한 기술에 적합합니다.</div>', unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        with c1:
+            disc_dcf = st.slider("할인율 WACC (%)", 5, 40, 15, key="g6_disc_dcf") / 100
+            royalty_dcf = st.slider("로열티율 (%)", 1, 20, 5, key="g6_roy_dcf") / 100
+        with c2:
+            growth_dcf = st.slider("터미널 성장률 (%)", 0, 10, 3, key="g6_grow_dcf") / 100
+            tax_dcf = st.slider("법인세율 (%)", 10, 40, 22, key="g6_tax_dcf") / 100
+        rev_dcf = _g6_revenue_inputs("dcf")
+        if st.button("▶ DCF 가치평가 실행", type="primary", key="g6_run_dcf"):
+            with st.spinner("DCF 계산 중..."):
+                result = api_post("/valuation/dcf", {
+                    "tech_id": st.session_state.tech_id, "tech_name": st.session_state.tech_name,
+                    "revenue_forecast": rev_dcf, "discount_rate": disc_dcf,
+                    "royalty_rate": royalty_dcf, "terminal_growth": growth_dcf, "tax_rate": tax_dcf,
+                    "method": "dcf",
+                })
+            if result:
+                _save_gate(6, result)
+                st.session_state["_g6_dcf_result"] = result
+                out = result.get("output_doc", result)
+                val = out.get("valuation_usd") or out.get("npv_usd") or out.get("value_usd", 0)
+                st.metric("DCF 기술 가치 (NPV)", f"${val:,.0f}" if val else "산출 불가")
+                render_gate_card(result.get("gate",""), float(result.get("score",0)),
+                                 "G6 DCF 가치평가", result.get("next_actions",[]))
+                with st.expander("DCF 상세"):
+                    render_output_doc(result)
+        elif st.session_state.get("_g6_dcf_result"):
+            r = st.session_state["_g6_dcf_result"]
+            out = r.get("output_doc", r)
             val = out.get("valuation_usd") or out.get("npv_usd") or out.get("value_usd", 0)
-            st.metric("추정 기술 가치", f"${val:,.0f}" if val else "산출 불가")
-            render_gate_card(result.get("gate",""), float(result.get("score",0)),
-                             "G6 가치평가", result.get("next_actions",[]))
-            with st.expander("상세 결과"):
-                render_output_doc(result)
+            st.metric("DCF 기술 가치 (NPV)", f"${val:,.0f}" if val else "산출 불가")
+
+    with tab_cca:
+        st.markdown('<div class="info-card">💡 유사 거래/기업 사례와 비교하여 상대적 가치를 산정합니다. 시장 데이터가 풍부한 기술에 적합합니다.</div>', unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        with c1:
+            sector = st.selectbox("산업 섹터", ["ICT/SW","바이오/의료","소재/화학","기계/장비","에너지","기타"], key="g6_sector")
+            mkt_mult = st.slider("EV/EBITDA 배수 (배)", 3, 30, 10, key="g6_mult")
+        with c2:
+            comp_rev = st.number_input("비교 기업 연매출 (USD)", min_value=0, value=5_000_000, step=100_000, key="g6_comp_rev")
+            tech_share = st.slider("기술 기여도 (%)", 5, 80, 30, key="g6_tshare") / 100
+        if st.button("▶ CCA 가치평가 실행", type="primary", key="g6_run_cca"):
+            with st.spinner("CCA 계산 중..."):
+                result = api_post("/valuation/dcf", {
+                    "tech_id": st.session_state.tech_id, "tech_name": st.session_state.tech_name,
+                    "method": "cca", "sector": sector, "ev_ebitda_multiple": mkt_mult,
+                    "comparable_revenue": comp_rev, "tech_contribution": tech_share,
+                })
+            if result:
+                _save_gate(6, result)
+                st.session_state["_g6_cca_result"] = result
+                out = result.get("output_doc", result)
+                val = out.get("valuation_usd") or out.get("value_usd", 0)
+                st.metric("CCA 기술 가치", f"${val:,.0f}" if val else "산출 불가")
+                with st.expander("CCA 상세"):
+                    render_output_doc(result)
+        elif st.session_state.get("_g6_cca_result"):
+            r = st.session_state["_g6_cca_result"]
+            out = r.get("output_doc", r)
+            val = out.get("valuation_usd") or out.get("value_usd", 0)
+            st.metric("CCA 기술 가치", f"${val:,.0f}" if val else "산출 불가")
+
+    with tab_roa:
+        st.markdown('<div class="info-card">💡 블랙-숄즈 모델로 미래 불확실성(옵션가치)을 반영합니다. R&D 초기 단계·혁신 기술에 적합합니다.</div>', unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        with c1:
+            asset_val = st.number_input("기초자산 가치 (USD, 예상 매출 PV)", min_value=0, value=5_000_000, step=100_000, key="g6_roa_asset")
+            invest_cost = st.number_input("투자 비용 (USD, 행사가격)", min_value=0, value=2_000_000, step=100_000, key="g6_roa_cost")
+        with c2:
+            volatility = st.slider("변동성 σ (%)", 10, 100, 40, key="g6_vol") / 100
+            time_yr = st.slider("옵션 만기 (년)", 1, 10, 3, key="g6_time")
+            risk_free = st.slider("무위험이자율 (%)", 1, 10, 4, key="g6_rfr") / 100
+        if st.button("▶ ROA 가치평가 실행", type="primary", key="g6_run_roa"):
+            with st.spinner("블랙-숄즈 계산 중..."):
+                result = api_post("/valuation/dcf", {
+                    "tech_id": st.session_state.tech_id, "tech_name": st.session_state.tech_name,
+                    "method": "roa", "asset_value": asset_val, "investment_cost": invest_cost,
+                    "volatility": volatility, "time_to_expiry": time_yr, "risk_free_rate": risk_free,
+                })
+            if result:
+                _save_gate(6, result)
+                st.session_state["_g6_roa_result"] = result
+                out = result.get("output_doc", result)
+                val = out.get("valuation_usd") or out.get("option_value_usd") or out.get("value_usd", 0)
+                st.metric("ROA 옵션 가치", f"${val:,.0f}" if val else "산출 불가")
+                with st.expander("ROA 상세"):
+                    render_output_doc(result)
+        elif st.session_state.get("_g6_roa_result"):
+            r = st.session_state["_g6_roa_result"]
+            out = r.get("output_doc", r)
+            val = out.get("valuation_usd") or out.get("option_value_usd") or out.get("value_usd", 0)
+            st.metric("ROA 옵션 가치", f"${val:,.0f}" if val else "산출 불가")
+
+    with tab_compare:
+        st.markdown("### 🔀 3가지 방법론 비교 분석")
+        dcf_r = st.session_state.get("_g6_dcf_result")
+        cca_r = st.session_state.get("_g6_cca_result")
+        roa_r = st.session_state.get("_g6_roa_result")
+        _done = [x for x in [dcf_r, cca_r, roa_r] if x]
+        if not _done:
+            st.markdown('<div class="warn-card">⚠️ 비교를 위해 최소 1개 이상의 방법론을 먼저 실행하세요.</div>', unsafe_allow_html=True)
+        else:
+            def _get_val(r):
+                if not r: return None
+                out = r.get("output_doc", r)
+                return out.get("valuation_usd") or out.get("npv_usd") or out.get("option_value_usd") or out.get("value_usd")
+            vals = {"DCF": _get_val(dcf_r), "CCA": _get_val(cca_r), "ROA": _get_val(roa_r)}
+            avail = {k: v for k, v in vals.items() if v is not None}
+            cols_m = st.columns(len(avail))
+            for i, (mname, mval) in enumerate(avail.items()):
+                cols_m[i].metric(f"{mname} 가치", f"${mval:,.0f}")
+            if len(avail) >= 2:
+                mvals = list(avail.values())
+                avg_val = sum(mvals) / len(mvals)
+                lo_val  = min(mvals)
+                hi_val  = max(mvals)
+                st.markdown(f"""
+<div class="ok-card">
+<b>📊 종합 가치 범위</b><br>
+최저: <b>${lo_val:,.0f}</b> | 평균: <b>${avg_val:,.0f}</b> | 최고: <b>${hi_val:,.0f}</b><br>
+<small>⚡ 가중 평균 적용 시 시장 상황에 따라 보수적(DCF 50%, CCA 30%, ROA 20%) 또는 낙관적 조정 가능</small>
+</div>""", unsafe_allow_html=True)
+                try:
+                    import plotly.graph_objects as go
+                    fig = go.Figure(go.Bar(
+                        x=list(avail.keys()), y=list(avail.values()),
+                        marker_color=["#3b82f6","#8b5cf6","#22c55e"][:len(avail)],
+                        text=[f"${v:,.0f}" for v in avail.values()], textposition="auto"
+                    ))
+                    fig.update_layout(title="방법론별 가치 비교 (USD)", height=280, margin=dict(t=40,b=20))
+                    st.plotly_chart(fig, use_container_width=True)
+                except Exception:
+                    pass
+            gate_result = next((r for r in [dcf_r, cca_r, roa_r] if r and r.get("gate")), None)
+            if gate_result:
+                render_gate_card(gate_result.get("gate",""), float(gate_result.get("score",0)),
+                                 "G6 가치평가 종합", gate_result.get("next_actions",[]))
 
 
 # ════════════════════════════════════════════════════════════════
 # G10 KPI 대시보드
 # ════════════════════════════════════════════════════════════════
-elif st.session_state.page in ("g10", "kpi"):  # kpi 하위호환
+elif st.session_state.page == "g10":
     _h = api_get("/health", silent=True); _aok = _h is not None
     _th = st.session_state.get("theme","dark"); _bg = st.session_state.get("bg_on",True)
     st.markdown(f"<script>document.body.setAttribute('data-theme','{_th}');document.body.classList.{'add' if _bg else 'remove'}('bg-on');</script>", unsafe_allow_html=True)
@@ -4152,58 +4272,10 @@ elif st.session_state.page == "g9":
 # 로드맵 (레거시 — G5 실행 로드맵 탭으로 이동 권장)
 # ════════════════════════════════════════════════════════════════
 elif st.session_state.page == "roadmap":
-    _h = api_get("/health", silent=True); _aok = _h is not None
-    _th = st.session_state.get("theme","dark"); _bg = st.session_state.get("bg_on",True)
-    st.markdown(f"<script>document.body.setAttribute('data-theme','{_th}');document.body.classList.{'add' if _bg else 'remove'}('bg-on');</script>", unsafe_allow_html=True)
-    with st.sidebar:
-        render_app_sidebar(_aok)
-    render_context_banner()
-    st.title("🗺️ 전체 로드맵 (G5 → 실행 로드맵 탭 권장)")
-    render_stage_bar()
-
-    col1, col2 = st.columns(2)
-    with col1:
-        tech_type = st.selectbox("기술 유형", ["general","biotech","ICT","device","material"])
-        region    = st.selectbox("목표 국가", ["KOR","USA","EU","JPN","CHN","SGP"])
-    with col2:
-        trl_cur = st.slider("현재 TRL", 1, 9, st.session_state.trl, key="rm_cur2")
-        trl_tgt = st.slider("목표 TRL", trl_cur, 9, 9, key="rm_tgt2")
-
-    if st.button("⚡ 전체 로드맵 생성", type="primary"):
-        with st.spinner("G0~G10 로드맵 생성 중... (30~60초)"):
-            result = api_post("/roadmap/full", {
-                "tech_id": st.session_state.tech_id,
-                "tech_name": st.session_state.tech_name,
-                "tech_type": tech_type, "region": region,
-                "trl_current": trl_cur, "trl_target": trl_tgt,
-            })
-        if result:
-            stages = result.get("stages", {})
-            if stages:
-                try:
-                    import plotly.graph_objects as go
-                    x = list(stages.keys())
-                    y = [v.get("score",0) for v in stages.values()]
-                    colors = ["#22c55e" if v.get("gate")=="Go" else
-                              "#eab308" if v.get("gate")=="Hold" else "#ef4444"
-                              for v in stages.values()]
-                    fig = go.Figure(go.Bar(x=x, y=y, marker_color=colors,
-                                          text=[f"{s:.0f}" for s in y],
-                                          textposition="auto"))
-                    fig.update_layout(title="G-Stage Gate 점수", height=300,
-                                      margin=dict(t=40,b=20))
-                    st.plotly_chart(fig, use_container_width=True)
-                except Exception:
-                    pass
-
-                for sid, sdata in stages.items():
-                    gate  = sdata.get("gate","")
-                    score = sdata.get("score",0)
-                    icon  = "🟢" if gate=="Go" else "🟡" if gate=="Hold" else "🔴"
-                    with st.expander(f"{icon} {sid} — {gate} ({score:.0f}점)"):
-                        render_output_doc(sdata, collapsed=True)
-            else:
-                render_output_doc(result)
+    # roadmap 페이지는 G5 실행 로드맵 탭으로 통합 — MECE 구조 준수
+    st.session_state.page = "g5"
+    st.session_state["_g5_tab"] = "roadmap"
+    st.rerun()
 
 
 # ════════════════════════════════════════════════════════════════
