@@ -651,6 +651,13 @@ _DEFAULTS = {
     "_ws_filter_gate": "전체",  # 워크스페이스 필터
     "_ws_saved_views": [],      # 저장된 뷰 목록 [{name, filter_gate}]
     "_ws_selected_stage": None, # 듀얼패널 선택 스테이지
+    # Smart KPI Column Layout
+    "_kpi_visible": ["completed", "avg_score", "kill_hold", "alerts"],
+    # Bulk Operation
+    "_bulk_selected": [],       # 선택된 tech id 목록
+    "_bulk_action": None,
+    # AI Agent Governance
+    "_agent_log": [],           # [{ts, endpoint, params_preview, result_summary, approved}]
 }
 for k, v in _DEFAULTS.items():
     if k not in st.session_state:
@@ -681,12 +688,33 @@ def api_get(path: str, silent: bool = False) -> dict | None:
     return None
 
 def api_post(path: str, body: dict, silent: bool = False) -> dict | None:
+    import datetime as _dt
     try:
         r = requests.post(f"{API_URL}{path}", json=body, headers=_headers(), timeout=90)
+        result = None
         if r.status_code == 200:
-            return r.json()
-        if not silent:
+            result = r.json()
+        elif not silent:
             st.error(f"API {r.status_code}: {r.text[:300]}")
+        # AI Agent Governance 로그 기록
+        _log = st.session_state.get("_agent_log", [])
+        params_preview = ", ".join(f"{k}={str(v)[:20]}" for k, v in list(body.items())[:3])
+        result_summary = ""
+        if result:
+            gate = result.get("gate","")
+            score = result.get("score","")
+            result_summary = f"gate={gate} score={score}" if gate else str(list(result.keys())[:3])
+        _log.append({
+            "ts":      _dt.datetime.now().strftime("%H:%M:%S"),
+            "date":    _dt.datetime.now().strftime("%m/%d"),
+            "endpoint": path,
+            "params":  params_preview,
+            "status":  r.status_code,
+            "result":  result_summary,
+            "approved": None,   # None=미검토, True=승인, False=거부
+        })
+        st.session_state["_agent_log"] = _log[-50:]  # 최근 50건 유지
+        return result
     except Exception as e:
         if not silent:
             st.error(f"서버 연결 실패: {e}")
@@ -1621,6 +1649,44 @@ if st.session_state.page == "home":
                         st.session_state.move_mode = None
                         st.rerun()
 
+        # ── Bulk Operation 모드 토글 ─────────────────────────
+        bulk_mode = st.session_state.get("_bulk_mode", False)
+        brow1, brow2 = st.columns([3, 1])
+        with brow1:
+            if st.button("☑ 일괄 선택" if not bulk_mode else "✕ 선택 취소",
+                         key="sb_bulk_toggle", use_container_width=True):
+                st.session_state["_bulk_mode"]     = not bulk_mode
+                st.session_state["_bulk_selected"] = []
+                st.rerun()
+        with brow2:
+            if bulk_mode and st.session_state.get("_bulk_selected"):
+                cnt = len(st.session_state["_bulk_selected"])
+                st.markdown(f'<span class="bm-tag bm-tag-green">{cnt}개 선택</span>',
+                            unsafe_allow_html=True)
+
+        # 일괄 액션 바 (선택 항목 있을 때만)
+        if bulk_mode and st.session_state.get("_bulk_selected"):
+            sel_ids = st.session_state["_bulk_selected"]
+            st.markdown('<div class="info-card" style="padding:8px">', unsafe_allow_html=True)
+            ba1, ba2, ba3 = st.columns(3)
+            if ba1.button("📄 일괄 보고서", key="bulk_report", use_container_width=True):
+                with st.spinner(f"{len(sel_ids)}개 기술 보고서 생성 중…"):
+                    for tid in sel_ids:
+                        tech = next((t for t in st.session_state.recent_techs if t["id"] == tid), None)
+                        if tech:
+                            api_post("/reports/pipeline", {
+                                "tech_id": tid, "tech_name": tech.get("name",""),
+                                "trl": tech.get("trl", 4), "tier": "LITE",
+                            })
+                st.success(f"✅ {len(sel_ids)}개 보고서 생성 완료")
+                st.session_state["_bulk_selected"] = []
+            if ba2.button("🗺️ 포트폴리오 맵", key="bulk_map", use_container_width=True):
+                st.session_state.page = "workspace"; st.rerun()
+            if ba3.button("🗑 선택 해제", key="bulk_clear", use_container_width=True):
+                st.session_state["_bulk_selected"] = []
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+
         # 최근 분석 목록 (프로젝트 필터 적용)
         filtered = [
             t for t in st.session_state.recent_techs
@@ -1629,24 +1695,44 @@ if st.session_state.page == "home":
         for tech in filtered:
             proj_label = tech.get("project", "")
             name_short = tech["name"][:18] + ("…" if len(tech["name"]) > 18 else "")
-            # 행 클릭 → 워크스페이스 이동, ⇥ 버튼 → 프로젝트 이동 모드
-            c1, c2 = st.columns([5, 1])
-            with c1:
-                if st.button(
-                    f"{tech['icon']} {name_short}",
-                    key=f"recent_{tech['id']}",
-                    use_container_width=True,
-                    help=proj_label,
-                ):
-                    st.session_state.tech_id   = tech["id"]
-                    st.session_state.tech_name = tech["name"]
-                    st.session_state.trl       = tech["trl"]
-                    st.session_state.page      = "workspace"
-                    st.rerun()
-            with c2:
-                if st.button("↗", key=f"move_{tech['id']}", help="프로젝트로 이동"):
-                    st.session_state.move_mode = tech["id"]
-                    st.rerun()
+            tid = tech["id"]
+
+            if bulk_mode:
+                # 체크박스 행
+                sel_list = st.session_state.get("_bulk_selected", [])
+                checked = tid in sel_list
+                cb_col, name_col = st.columns([1, 5])
+                with cb_col:
+                    if st.checkbox("", value=checked, key=f"bulk_cb_{tid}"):
+                        if tid not in sel_list:
+                            sel_list.append(tid)
+                            st.session_state["_bulk_selected"] = sel_list
+                    else:
+                        if tid in sel_list:
+                            sel_list.remove(tid)
+                            st.session_state["_bulk_selected"] = sel_list
+                with name_col:
+                    trl_col = "#4ade80" if tech["trl"] >= 7 else "#fbbf24" if tech["trl"] >= 4 else "#94a3b8"
+                    st.markdown(
+                        f'<div style="padding:4px 0;font-size:11px;color:#cbd5e1">'
+                        f'{tech["icon"]} {name_short}'
+                        f'<span style="font-size:9px;color:{trl_col};margin-left:6px">TRL {tech["trl"]}</span></div>',
+                        unsafe_allow_html=True)
+            else:
+                # 기존 버튼 행
+                c1, c2 = st.columns([5, 1])
+                with c1:
+                    if st.button(f"{tech['icon']} {name_short}", key=f"recent_{tid}",
+                                 use_container_width=True, help=proj_label):
+                        st.session_state.tech_id   = tid
+                        st.session_state.tech_name = tech["name"]
+                        st.session_state.trl       = tech["trl"]
+                        st.session_state.page      = "workspace"
+                        st.rerun()
+                with c2:
+                    if st.button("↗", key=f"move_{tid}", help="프로젝트로 이동"):
+                        st.session_state.move_mode = tid
+                        st.rerun()
 
     # ──────────── 메인 콘텐츠 (3단계 위저드) ────────────
     step = st.session_state.home_step
@@ -2285,7 +2371,7 @@ elif st.session_state.page == "workspace":
     st.title("🏠 기술 워크스페이스")
     render_stage_bar()
 
-    # ── KPI 요약 (상단 4개) ──────────────────────────────────────────
+    # ── Smart KPI Column Layout (Anaqua 스타일 — 사용자 커스터마이징) ──
     completed = sum(1 for g in st.session_state.stage_gates.values() if g.get("gate") == "Go")
     kills     = sum(1 for g in st.session_state.stage_gates.values() if g.get("gate") == "Kill")
     holds     = sum(1 for g in st.session_state.stage_gates.values() if g.get("gate") == "Hold")
@@ -2293,11 +2379,40 @@ elif st.session_state.page == "workspace":
                  / max(len(st.session_state.stage_gates), 1))
     alerts_d  = api_get(f"/g10/kpi/{st.session_state.tech_id}/alerts", silent=True)
     alert_cnt = alerts_d.get("alert_count", 0) if alerts_d else 0
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("완료 단계", f"{completed}/11", "Go 판정")
-    k2.metric("평균 점수", f"{avg_score:.1f}", "0~100점")
-    k3.metric("Kill / Hold", f"{kills} / {holds}", "재검토 필요" if kills else ("보류 있음" if holds else "없음"))
-    k4.metric("KPI 알림", alert_cnt, "🚨" if alert_cnt else "정상")
+
+    _ALL_KPI = {
+        "completed":  ("완료 단계",   f"{completed}/11",        "Go 판정",                        "🏁"),
+        "avg_score":  ("평균 점수",   f"{avg_score:.1f}",       "0~100점",                        "📊"),
+        "kill_hold":  ("Kill / Hold", f"{kills} / {holds}",     "재검토 필요" if kills else "없음","⚠️"),
+        "alerts":     ("KPI 알림",    str(alert_cnt),            "🚨" if alert_cnt else "정상",    "🔔"),
+        "trl":        ("TRL",         str(st.session_state.trl), "현재 기술성숙도",                "🔬"),
+        "techs":      ("기술 수",     str(len(st.session_state.get("recent_techs",[]))), "등록 기술","📋"),
+        "go_rate":    ("Go 비율",     f"{completed/11*100:.0f}%", "G0~G10 기준",                  "🎯"),
+        "audit_cnt":  ("이력 건수",   str(len(st.session_state.get("gate_audit",[]))),"분석 실행","📝"),
+    }
+    visible_keys = st.session_state.get("_kpi_visible", list(_ALL_KPI)[:4])
+
+    kpi_row, kpi_cfg_btn = st.columns([5, 1])
+    with kpi_cfg_btn:
+        if st.button("⚙️ KPI 설정", key="ws_kpi_cfg"):
+            st.session_state["_show_kpi_cfg"] = not st.session_state.get("_show_kpi_cfg", False)
+    if st.session_state.get("_show_kpi_cfg", False):
+        with st.expander("KPI 카드 선택 (최대 6개)", expanded=True):
+            new_vis = []
+            cfg_cols = st.columns(4)
+            for ci, (k, (label, val, delta, ico)) in enumerate(_ALL_KPI.items()):
+                with cfg_cols[ci % 4]:
+                    if st.checkbox(f"{ico} {label}", value=(k in visible_keys), key=f"kpi_cfg_{k}"):
+                        new_vis.append(k)
+            if new_vis:
+                st.session_state["_kpi_visible"] = new_vis[:6]
+
+    visible_keys = st.session_state.get("_kpi_visible", list(_ALL_KPI)[:4])
+    kpi_cols = st.columns(max(len(visible_keys), 1))
+    for ci, key in enumerate(visible_keys):
+        if key in _ALL_KPI:
+            label, val, delta, ico = _ALL_KPI[key]
+            kpi_cols[ci].metric(f"{ico} {label}", val, delta)
 
     st.divider()
 
@@ -4102,8 +4217,8 @@ elif st.session_state.page == "admin":
         render_app_sidebar(_aok)
     st.title("⚙️ 관리자 콘솔")
 
-    tab_health, tab_metrics, tab_jobs, tab_login = st.tabs(
-        ["🩺 헬스 체크", "📊 API 메트릭", "📋 Job 모니터", "🔐 인증"]
+    tab_health, tab_metrics, tab_jobs, tab_govern, tab_login = st.tabs(
+        ["🩺 헬스 체크", "📊 API 메트릭", "📋 Job 모니터", "🛡 AI 거버넌스", "🔐 인증"]
     )
 
     with tab_health:
@@ -4144,6 +4259,70 @@ elif st.session_state.page == "admin":
                         render_output_doc(job["result"], collapsed=True)
                 if job.get("error"):
                     st.error(job["error"])
+
+    with tab_govern:
+        st.subheader("AI 에이전트 실행 이력 (Governance Log)")
+        st.caption("모든 API POST 호출을 기록합니다. 승인/거부로 에이전트 행동을 감사할 수 있습니다.")
+        logs = list(reversed(st.session_state.get("_agent_log", [])))
+
+        # 통계 카드
+        total = len(logs)
+        approved   = sum(1 for l in logs if l.get("approved") is True)
+        rejected   = sum(1 for l in logs if l.get("approved") is False)
+        unreviewed = total - approved - rejected
+        s1, s2, s3, s4 = st.columns(4)
+        s1.metric("전체 호출",  total)
+        s2.metric("승인",        approved,   delta="✅")
+        s3.metric("거부",        rejected,   delta="⛔" if rejected else None)
+        s4.metric("미검토",      unreviewed, delta="🔵" if unreviewed else None)
+
+        if st.button("🗑 이력 초기화", key="adm_gov_clear"):
+            st.session_state["_agent_log"] = []
+            st.rerun()
+
+        st.divider()
+
+        if not logs:
+            st.markdown('<div class="info-card">AI 에이전트 호출 이력이 없습니다. 분석을 실행하면 여기에 기록됩니다.</div>',
+                        unsafe_allow_html=True)
+        else:
+            for i, entry in enumerate(logs[:30]):
+                approved_val = entry.get("approved")
+                status_col = "#4ade80" if approved_val is True else "#f87171" if approved_val is False else "#475569"
+                status_icon = "✅" if approved_val is True else "⛔" if approved_val is False else "🔵"
+                http_col = "#4ade80" if entry.get("status") == 200 else "#f87171"
+
+                _ep = entry["endpoint"]; _pr = entry["params"]
+                _dt_str = entry["date"]; _ts_str = entry["ts"]
+                _res = entry.get("result",""); _st = entry.get("status","?")
+                _res_html = f'<div style="font-size:9px;color:#64748b;margin-top:1px">{_res}</div>' if _res else ""
+                row_html = (
+                    f'<div style="display:flex;align-items:center;gap:8px;'
+                    f'padding:8px;border-radius:7px;border:1px solid rgba(255,255,255,.05);'
+                    f'background:#1a1d27;margin:4px 0">'
+                    f'<span style="font-size:14px">{status_icon}</span>'
+                    f'<div style="flex:1;min-width:0">'
+                    f'<div style="font-size:10px;color:#60a5fa;font-family:monospace">{_ep}</div>'
+                    f'<div style="font-size:9px;color:#475569;margin-top:2px">{_pr}</div>'
+                    f'{_res_html}'
+                    f'</div>'
+                    f'<div style="text-align:right;flex-shrink:0">'
+                    f'<div style="font-size:8px;color:#334155">{_dt_str} {_ts_str}</div>'
+                    f'<span style="font-size:9px;color:{http_col}">{_st}</span>'
+                    f'</div></div>'
+                )
+                st.markdown(row_html, unsafe_allow_html=True)
+
+                # 승인/거부 버튼 (미검토 항목만)
+                if approved_val is None:
+                    idx = len(logs) - 1 - i  # 원본 인덱스
+                    ba, bb = st.columns(2)
+                    if ba.button("✅ 승인", key=f"gov_ok_{i}", use_container_width=True):
+                        st.session_state["_agent_log"][idx]["approved"] = True
+                        st.rerun()
+                    if bb.button("⛔ 거부", key=f"gov_no_{i}", use_container_width=True):
+                        st.session_state["_agent_log"][idx]["approved"] = False
+                        st.rerun()
 
     with tab_login:
         if st.session_state.token:
