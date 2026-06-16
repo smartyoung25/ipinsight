@@ -658,6 +658,10 @@ _DEFAULTS = {
     "_bulk_action": None,
     # AI Agent Governance
     "_agent_log": [],           # [{ts, endpoint, params_preview, result_summary, approved}]
+    # G6 방법론별 결과 캐시
+    "_g6_dcf_result": None,
+    "_g6_cca_result": None,
+    "_g6_roa_result": None,
 }
 for k, v in _DEFAULTS.items():
     if k not in st.session_state:
@@ -3108,9 +3112,13 @@ elif st.session_state.page == "g4":
                 if result:
                     new_total = result.get("total_interviews", 0)
                     st.success(f"저장 완료 — 누적 {new_total}건")
+                    st.session_state.g4_data["interview_count"] = new_total
                     if loi_yn:
                         st.session_state.g4_data["loi_count"] = \
                             st.session_state.g4_data.get("loi_count", 0) + 1
+                    if poc_yn:
+                        st.session_state.g4_data["poc_requests"] = \
+                            st.session_state.g4_data.get("poc_requests", 0) + 1
                     if new_total >= 100:
                         st.balloons()
                     st.rerun()
