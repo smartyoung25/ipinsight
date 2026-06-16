@@ -2437,30 +2437,84 @@ elif st.session_state.page == "workspace":
                     st.session_state.page = "g0"; st.rerun()
 
         else:
-            # ── Audit Trail 패널 ─────────────────────────────
-            st.markdown('<div class="sec-header-v2">활동 타임라인 (Audit Trail)</div>', unsafe_allow_html=True)
-            audit = list(reversed(st.session_state.gate_audit))
-            if not audit:
-                st.markdown('<div class="info-card">Gate 분석을 실행하면 여기에 이력이 기록됩니다.</div>', unsafe_allow_html=True)
-            else:
-                for entry in audit[:15]:
-                    g = entry.get("gate","")
-                    col = {"Go":"#4ade80","Hold":"#fbbf24","Kill":"#f87171"}.get(g,"#475569")
-                    st.markdown(
-                        f'<div style="display:flex;gap:10px;align-items:flex-start;'
-                        f'padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)">'
-                        f'<div style="min-width:38px;text-align:right;font-size:9px;color:#334155;padding-top:2px">'
-                        f'{entry["date"]}<br>{entry["ts"]}</div>'
-                        f'<div style="width:2px;background:{col};border-radius:2px;align-self:stretch;flex-shrink:0"></div>'
-                        f'<div>'
-                        f'<div style="font-size:11px;font-weight:600;color:#cbd5e1">'
-                        f'{entry["icon"]} {entry["gid"]} {entry["name"]}</div>'
-                        f'<div style="font-size:10px;color:{col};margin-top:2px">'
-                        f'{g} · {entry["score"]:.0f}점</div>'
-                        f'<div style="font-size:9px;color:#334155;margin-top:1px">{entry.get("tech_name","")}</div>'
-                        f'</div></div>',
-                        unsafe_allow_html=True,
-                    )
+            # ── 우측 패널: 탭 2개 ────────────────────────────
+            tab_audit, tab_portfolio = st.tabs(["📋 활동 타임라인", "🗺️ 포트폴리오 맵"])
+
+            with tab_audit:
+                audit = list(reversed(st.session_state.gate_audit))
+                if not audit:
+                    st.markdown('<div class="info-card">Gate 분석을 실행하면 여기에 이력이 기록됩니다.</div>', unsafe_allow_html=True)
+                else:
+                    for entry in audit[:15]:
+                        g = entry.get("gate","")
+                        col = {"Go":"#4ade80","Hold":"#fbbf24","Kill":"#f87171"}.get(g,"#475569")
+                        st.markdown(
+                            f'<div style="display:flex;gap:10px;align-items:flex-start;'
+                            f'padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)">'
+                            f'<div style="min-width:38px;text-align:right;font-size:9px;color:#334155;padding-top:2px">'
+                            f'{entry["date"]}<br>{entry["ts"]}</div>'
+                            f'<div style="width:2px;background:{col};border-radius:2px;align-self:stretch;flex-shrink:0"></div>'
+                            f'<div>'
+                            f'<div style="font-size:11px;font-weight:600;color:#cbd5e1">'
+                            f'{entry["icon"]} {entry["gid"]} {entry["name"]}</div>'
+                            f'<div style="font-size:10px;color:{col};margin-top:2px">'
+                            f'{g} · {entry["score"]:.0f}점</div>'
+                            f'<div style="font-size:9px;color:#334155;margin-top:1px">{entry.get("tech_name","")}</div>'
+                            f'</div></div>',
+                            unsafe_allow_html=True,
+                        )
+
+            with tab_portfolio:
+                # ── Portfolio Heat Map (Clarivate 스타일) ────
+                techs = st.session_state.get("recent_techs", [])
+                if not techs:
+                    st.markdown('<div class="info-card">홈 화면에서 기술을 등록하면 포트폴리오 맵이 표시됩니다.</div>', unsafe_allow_html=True)
+                else:
+                    st.caption(f"총 {len(techs)}개 기술 · G0~G10 단계 분포")
+                    # 스테이지별 기술 카운트
+                    _stage_counts = {n: 0 for n in range(11)}
+                    for tech in techs:
+                        trl_val = int(tech.get("trl", 4))
+                        # TRL → 대략적 스테이지 매핑
+                        approx_stage = min(10, max(0, (trl_val - 1) * 10 // 8))
+                        _stage_counts[approx_stage] += 1
+
+                    max_count = max(_stage_counts.values()) or 1
+                    heat_rows = ""
+                    for n, (gid, name, icon) in STAGE_META.items():
+                        count = _stage_counts[n]
+                        pct   = count / max_count
+                        intensity = int(pct * 200)
+                        bg = f"rgba(59,130,246,{pct:.2f})" if count > 0 else "rgba(255,255,255,.03)"
+                        heat_rows += (
+                            f'<div style="display:flex;align-items:center;gap:8px;'
+                            f'padding:5px 8px;border-radius:6px;background:{bg};margin:2px 0">'
+                            f'<span style="font-size:11px;min-width:24px">{icon}</span>'
+                            f'<span style="font-size:10px;color:#94a3b8;min-width:60px">{gid}</span>'
+                            f'<div style="flex:1;height:4px;background:rgba(255,255,255,.07);border-radius:2px">'
+                            f'<div style="width:{pct*100:.0f}%;height:100%;background:#3b82f6;border-radius:2px"></div></div>'
+                            f'<span style="font-size:10px;color:#60a5fa;min-width:20px;text-align:right">{count}</span>'
+                            f'</div>'
+                        )
+                    st.markdown(f'<div style="margin-top:8px">{heat_rows}</div>', unsafe_allow_html=True)
+
+                    st.divider()
+                    # 기술 목록 간략 표
+                    for tech in techs[:6]:
+                        trl_v = int(tech.get("trl", 4))
+                        trl_col = "#4ade80" if trl_v >= 7 else "#fbbf24" if trl_v >= 4 else "#94a3b8"
+                        st.markdown(
+                            f'<div style="display:flex;align-items:center;gap:8px;'
+                            f'padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer">'
+                            f'<span style="font-size:14px">{tech.get("icon","🔬")}</span>'
+                            f'<div style="flex:1">'
+                            f'<div style="font-size:11px;color:#e2e8f0">{tech.get("name","")}</div>'
+                            f'<div style="font-size:9px;color:#475569">{tech.get("project","")}</div>'
+                            f'</div>'
+                            f'<span style="font-size:9px;color:{trl_col};font-weight:700">TRL {trl_v}</span>'
+                            f'</div>',
+                            unsafe_allow_html=True,
+                        )
 
     # 마지막 결과 Gate 카드 (워크스페이스 하단, 패널 미선택 시)
     if st.session_state.last_result and st.session_state.last_stage is not None \
