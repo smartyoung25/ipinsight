@@ -3303,8 +3303,12 @@ elif st.session_state.page == "g5":
     with tab_smk:
         st.subheader("🚀 SMK — 사업화시장키트 (S·M·K)")
         st.caption("G3 시장분석 + G4 고객검증 + G5 BM을 통합해 GTM 실행 키트를 자동 생성합니다.")
-        g3_tam  = st.number_input("TAM (백만 USD)", min_value=0, value=500, key="smk_tam")
-        g3_grow = st.number_input("시장 성장률 (%)", min_value=0.0, value=8.0, key="smk_grow")
+        _g3_tam_default  = int(st.session_state.get("g3_tam", 500))
+        _g3_grow_default = float(st.session_state.get("g3_grow", 8.0))
+        if _g3_tam_default != 500 or _g3_grow_default != 8.0:
+            st.markdown('<div class="ok-card">✅ G3 시장성 분석 데이터 자동 인계됨</div>', unsafe_allow_html=True)
+        g3_tam  = st.number_input("TAM (백만 USD)", min_value=0, value=_g3_tam_default, key="smk_tam")
+        g3_grow = st.number_input("시장 성장률 (%)", min_value=0.0, value=_g3_grow_default, key="smk_grow")
         if st.button("⚡ SMK 통합 생성 (G3+G4+G5)", type="primary", key="smk_run"):
             with st.spinner("SMK 생성 중... (30~60초)"):
                 r = api_post("/service/smk-from-pipeline", {
@@ -3330,6 +3334,9 @@ elif st.session_state.page == "g5":
                         st.info(val if isinstance(val, str) else str(val))
                 with st.expander("전체 SMK JSON"):
                     render_output_doc(r, collapsed=True)
+
+    if st.session_state.pop("_g5_tab", None) == "roadmap":
+        st.markdown('<div class="info-card">📌 <b>전체 로드맵 페이지</b>는 이 탭으로 통합되었습니다 — 아래 🗺️ 실행 로드맵 탭을 사용하세요.</div>', unsafe_allow_html=True)
 
     with tab_rm:
         st.subheader("🗺️ 실행 로드맵")
@@ -3852,7 +3859,7 @@ elif st.session_state.page == "g0":
     st.title("🔭 G0 — 기술발굴")
     render_stage_bar(current=0)
 
-    tab_scout, tab_idf, tab_demand = st.tabs(["🔭 TechScout", "📄 IDF 발명공개서", "📋 수요조사서"])
+    tab_scout, tab_idf, tab_demand, tab_validate = st.tabs(["🔭 TechScout", "📄 IDF 발명공개서", "📋 수요조사서", "✅ 기술성립 검증"])
 
     with tab_scout:
         st.subheader("기술 후보 발굴 및 분류")
@@ -3894,6 +3901,74 @@ elif st.session_state.page == "g0":
             if r:
                 st.success("✅ 수요조사서 생성 완료")
                 render_output_doc(r.get("output_doc", r))
+
+    with tab_validate:
+        st.subheader("✅ 기술성립 검증 (G0 → G1 진입 전 체크)")
+        st.caption("기술이 G1 IP 구조화로 진입하기 전, 3가지 관문을 사전 점검합니다.")
+
+        st.markdown("#### 1️⃣ 기술 독자성 자가 체크")
+        check_cols = st.columns(3)
+        chk1 = check_cols[0].checkbox("신규성 — 기존 공개 기술과 명확히 구별됨")
+        chk2 = check_cols[1].checkbox("진보성 — 당업자가 쉽게 도달할 수 없는 개선")
+        chk3 = check_cols[2].checkbox("산업적 이용가능성 — 실제 제품·서비스에 적용 가능")
+        passed_prelim = sum([chk1, chk2, chk3])
+        if passed_prelim == 3:
+            st.markdown('<div class="ok-card">🟢 3/3 충족 — G1 진입 조건 사전 충족</div>', unsafe_allow_html=True)
+        elif passed_prelim >= 1:
+            st.markdown(f'<div class="warn-card">🟡 {passed_prelim}/3 충족 — 부족한 항목 보완 후 진입 권장</div>', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="warn-card">🔴 0/3 — IP 등록 가능성 낮음, 기술 개선 필요</div>', unsafe_allow_html=True)
+
+        st.markdown("#### 2️⃣ 선행 기술 AI 분석")
+        val_text = st.text_area("검증할 기술 설명", height=120,
+                                placeholder="특허 청구항 또는 기술 요약을 입력하세요…",
+                                key="g0_val_text")
+        val_domain = st.selectbox("기술 도메인", ["AI/SW", "바이오", "소재", "기계장치", "ICT", "에너지", "환경"], key="g0_val_dom")
+        val_scope  = st.multiselect("검증 범위", ["신규성", "진보성", "FTO(자유실시)", "표준 필수 특허"], default=["신규성", "진보성"], key="g0_val_scope")
+
+        if st.button("🔍 선행기술 검증 실행", type="primary", disabled=not val_text.strip(), key="g0_val_run"):
+            with st.spinner("선행기술 분석 중... (15~30초)"):
+                r = api_post("/stage/0", {
+                    "tech_id": st.session_state.tech_id or "G0-VAL",
+                    "input_data": {
+                        "tech_description": val_text,
+                        "domain": val_domain,
+                        "validation_scope": val_scope,
+                        "mode": "validation",
+                    }
+                })
+            if r:
+                _save_gate(0, r)
+                render_gate_card(r.get("gate",""), float(r.get("score",0)), "G0 기술성립 검증", r.get("next_actions",[]))
+                out = r.get("output_doc", r)
+                novelty   = out.get("novelty_assessment") or out.get("novelty")
+                inventive = out.get("inventive_step") or out.get("inventive")
+                if novelty:
+                    st.markdown(f"**신규성 판단**: {novelty}")
+                if inventive:
+                    st.markdown(f"**진보성 판단**: {inventive}")
+                with st.expander("전체 선행기술 분석 결과"):
+                    render_output_doc(r, collapsed=True)
+                if r.get("gate") == "Go":
+                    if st.button("▶ G1 IP 구조화로 이동", type="secondary", key="g0_val_to_g1"):
+                        st.session_state.page = "g1"; st.rerun()
+
+        st.markdown("#### 3️⃣ TRL 0→1 진입 조건 체크리스트")
+        trl_checks = {
+            "기술 원리가 문헌·논문으로 확인됨": False,
+            "유사 기술 대비 차별점 1개 이상 명확화됨": False,
+            "발명자가 특정됨 (개인 또는 팀)": False,
+            "기술 이전 또는 사업화 의향 확인됨": False,
+        }
+        all_checked = True
+        for label in trl_checks:
+            checked = st.checkbox(label, key=f"trl_chk_{label[:10]}")
+            if not checked:
+                all_checked = False
+        if all_checked:
+            st.success("✅ 모든 항목 충족 — G1 IP 구조화 진입 준비 완료")
+            if st.button("▶ G1 IP 구조화 시작", type="primary", key="g0_to_g1_btn"):
+                st.session_state.page = "g1"; st.rerun()
 
 
 # ════════════════════════════════════════════════════════════════
