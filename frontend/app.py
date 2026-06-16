@@ -662,6 +662,11 @@ _DEFAULTS = {
     "_g6_dcf_result": None,
     "_g6_cca_result": None,
     "_g6_roa_result": None,
+    # G9 결과 캐시 (보고서 센터 연동용)
+    "_g9_lic_result": None,
+    "_g9_ir_result": None,
+    "_g9_exit_result": None,
+    "_rpt_prefill": None,   # G9→REPORTS 저장 시 prefill 데이터
 }
 for k, v in _DEFAULTS.items():
     if k not in st.session_state:
@@ -1739,6 +1744,16 @@ if st.session_state.page == "home":
                         st.rerun()
 
     # ──────────── 메인 콘텐츠 (3단계 위저드) ────────────
+    # 역할 명확화 배너: HOME = 신규 기술 등록 전용
+    st.markdown(
+        "<div style='display:flex;align-items:center;gap:10px;padding:8px 14px;"
+        "background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);"
+        "border-radius:8px;margin-bottom:12px;font-size:12px;color:#a5b4fc'>"
+        "📌 <b>HOME</b>은 <b>신규 기술 등록 전용</b>입니다. "
+        "기존 기술의 심층 분석·비교·보고서는 "
+        "<b>워크스페이스</b> 또는 각 <b>G-Stage 페이지</b>를 사용하세요.</div>",
+        unsafe_allow_html=True,
+    )
     step = st.session_state.home_step
 
     # ── 스텝 진행 표시 ──────────────────────────────────────────
@@ -3119,6 +3134,13 @@ elif st.session_state.page == "g4":
                     if poc_yn:
                         st.session_state.g4_data["poc_requests"] = \
                             st.session_state.g4_data.get("poc_requests", 0) + 1
+                    if wtp > 0:
+                        prev_sum   = st.session_state.g4_data.get("_wtp_sum", 0)
+                        prev_count = st.session_state.g4_data.get("_wtp_count", 0)
+                        st.session_state.g4_data["_wtp_sum"]   = prev_sum + wtp
+                        st.session_state.g4_data["_wtp_count"] = prev_count + 1
+                        st.session_state.g4_data["wtp_avg_krw"] = \
+                            (prev_sum + wtp) // (prev_count + 1)
                     if new_total >= 100:
                         st.balloons()
                     st.rerun()
@@ -3281,13 +3303,18 @@ elif st.session_state.page == "g5":
 
     with tab_ue:
         st.subheader("Unit Economics 분석")
+        _g4 = st.session_state.get("g4_data", {})
+        _wtp_avg = _g4.get("wtp_avg_krw", 0)
+        if _wtp_avg:
+            st.markdown(f'<div class="ok-card">✅ G4 인터뷰 데이터 인계 — WTP 평균 {_wtp_avg:,.0f}원/월 ({_g4.get("interview_count",0)}건)</div>', unsafe_allow_html=True)
         col1, col2 = st.columns(2)
         with col1:
             cac   = st.number_input("CAC (원)",  min_value=0, value=500_000, step=50_000)
             ltv   = st.number_input("LTV (원)",  min_value=0, value=3_000_000, step=100_000)
             churn = st.slider("Churn율 (%/월)", 0.0, 30.0, 5.0)
         with col2:
-            arpu = st.number_input("ARPU (원/월)", min_value=0, value=200_000, step=10_000)
+            arpu = st.number_input("ARPU (원/월)", min_value=0,
+                                   value=int(_wtp_avg) if _wtp_avg else 200_000, step=10_000)
             gm   = st.slider("Gross Margin (%)", 0, 100, 70)
         ltv_cac  = ltv / max(cac, 1)
         payback  = cac / max(arpu * gm / 100, 1)
@@ -3312,7 +3339,8 @@ elif st.session_state.page == "g5":
         st.subheader("🚀 SMK — 사업화시장키트 (S·M·K)")
         st.caption("G3 시장분석 + G4 고객검증 + G5 BM을 통합해 GTM 실행 키트를 자동 생성합니다.")
         _g3_tam_default  = int(st.session_state.get("g3_tam", 500))
-        _g3_grow_default = float(st.session_state.get("g3_grow", 8.0))
+        # G3 성장률은 g3_growth 키로 저장됨 (g3_grow는 구 키명)
+        _g3_grow_default = float(st.session_state.get("g3_growth", st.session_state.get("g3_grow", 8.0)))
         if _g3_tam_default != 500 or _g3_grow_default != 8.0:
             st.markdown('<div class="ok-card">✅ G3 시장성 분석 데이터 자동 인계됨</div>', unsafe_allow_html=True)
         g3_tam  = st.number_input("TAM (백만 USD)", min_value=0, value=_g3_tam_default, key="smk_tam")
@@ -4324,7 +4352,12 @@ elif st.session_state.page == "g9":
                                                          "input_data": {"tech_description": lic_text,
                                                                         "royalty_rate": lic_royalty / 100}})
             if r:
+                st.session_state["_g9_lic_result"] = r
                 render_output_doc(r.get("output_doc", r))
+        if st.session_state.get("_g9_lic_result"):
+            if st.button("📄 보고서 센터에 저장 (R7)", key="g9_lic_to_rpt"):
+                st.session_state["_rpt_prefill"] = {"report_id": "R7_license", "result": st.session_state["_g9_lic_result"]}
+                st.session_state.page = "reports"; st.rerun()
 
     with tab_invest:
         st.subheader("투자유치 전략 (IR Deck 포함)")
@@ -4338,7 +4371,12 @@ elif st.session_state.page == "g9":
                                                              "investment_stage": inv_stage,
                                                              "target_amount_million_krw": inv_amt * 100}})
             if r:
+                st.session_state["_g9_ir_result"] = r
                 render_output_doc(r.get("output_doc", r))
+        if st.session_state.get("_g9_ir_result"):
+            if st.button("📄 보고서 센터에 저장 (R6)", key="g9_ir_to_rpt"):
+                st.session_state["_rpt_prefill"] = {"report_id": "R6_ir", "result": st.session_state["_g9_ir_result"]}
+                st.session_state.page = "reports"; st.rerun()
 
     with tab_exit:
         st.subheader("엑시트 전략 (M&A / IPO)")
@@ -4348,7 +4386,12 @@ elif st.session_state.page == "g9":
                 r = api_post("/gap/exit-strategy", {"tech_id": st.session_state.tech_id or "G9",
                                                     "input_data": {"tech_description": exit_text}})
             if r:
+                st.session_state["_g9_exit_result"] = r
                 render_output_doc(r.get("output_doc", r))
+        if st.session_state.get("_g9_exit_result"):
+            if st.button("📄 보고서 센터에 저장 (R9)", key="g9_exit_to_rpt"):
+                st.session_state["_rpt_prefill"] = {"report_id": "R9_exit", "result": st.session_state["_g9_exit_result"]}
+                st.session_state.page = "reports"; st.rerun()
 
 
 # ════════════════════════════════════════════════════════════════
