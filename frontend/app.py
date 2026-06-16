@@ -3586,7 +3586,7 @@ elif st.session_state.page == "g10":
         "new_customers":              ("신규고객",   "건",         10),
     }
 
-    tab_dash, tab_record, tab_alert = st.tabs(["📊 대시보드", "✏️ KPI 기록", "🔔 알림"])
+    tab_dash, tab_gate_map, tab_record, tab_alert = st.tabs(["📊 대시보드", "🗺️ 전체 게이트 현황", "✏️ KPI 기록", "🔔 알림"])
 
     with tab_dash:
         if st.button("🔄 새로고침", key="kpi_rf"):
@@ -3619,6 +3619,71 @@ elif st.session_state.page == "g10":
                     f"{'🚨' if has_d else '⚠️'} KPI 알림 {alerts_d['alert_count']}건 — '알림' 탭 확인")
         else:
             st.info("KPI 기록 없음. 'KPI 기록' 탭에서 입력하세요.")
+
+    with tab_gate_map:
+        st.subheader("🗺️ G0~G10 전체 게이트 현황")
+        st.caption("현재 기술의 각 Stage Gate 판정 결과를 한눈에 확인합니다.")
+        gates = st.session_state.get("stage_gates", {})
+        if not gates:
+            st.markdown('<div class="warn-card">⚠️ 아직 평가된 Gate가 없습니다. G0부터 순서대로 분석을 진행하세요.</div>', unsafe_allow_html=True)
+        else:
+            try:
+                import plotly.graph_objects as go
+                x_labels = [f"G{i}" for i in range(11)]
+                y_scores = [gates.get(i, {}).get("score", 0) for i in range(11)]
+                gate_vals = [gates.get(i, {}).get("gate", "—") for i in range(11)]
+                colors = [
+                    "#4ade80" if g == "Go" else "#eab308" if g == "Hold" else
+                    "#ef4444" if g == "Kill" else "#334155"
+                    for g in gate_vals
+                ]
+                fig = go.Figure(go.Bar(
+                    x=x_labels, y=y_scores, marker_color=colors,
+                    text=[f"{g}<br>{s:.0f}점" if s > 0 else g for g, s in zip(gate_vals, y_scores)],
+                    textposition="auto",
+                ))
+                fig.update_layout(
+                    title=f"{st.session_state.tech_name or '기술'} — G0~G10 Gate 현황",
+                    yaxis=dict(range=[0, 110], title="점수"),
+                    height=320, margin=dict(t=50, b=20),
+                    plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color="#e2e8f0"),
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            except Exception:
+                pass
+
+            completed = sum(1 for i in range(11) if i in gates)
+            go_cnt    = sum(1 for i in range(11) if gates.get(i, {}).get("gate") == "Go")
+            hold_cnt  = sum(1 for i in range(11) if gates.get(i, {}).get("gate") == "Hold")
+            kill_cnt  = sum(1 for i in range(11) if gates.get(i, {}).get("gate") == "Kill")
+            mc1, mc2, mc3, mc4 = st.columns(4)
+            mc1.metric("평가 완료", f"{completed}/11")
+            mc2.metric("🟢 Go", go_cnt)
+            mc3.metric("🟡 Hold", hold_cnt)
+            mc4.metric("🔴 Kill", kill_cnt)
+
+            st.markdown("**상세 Gate 결과**")
+            for i in range(11):
+                if i in gates:
+                    g = gates[i]
+                    icon = "🟢" if g["gate"]=="Go" else "🟡" if g["gate"]=="Hold" else "🔴"
+                    gid, gname, _ = STAGE_META.get(i, (f"G{i}", f"Stage {i}", "📌"))
+                    st.markdown(
+                        f"<div class='gate-card-v2 {'go' if g['gate']=='Go' else 'hold' if g['gate']=='Hold' else 'kill'}' "
+                        f"style='padding:10px 16px;margin:4px 0'>"
+                        f"{icon} <b>{gid} {gname}</b> — {g['gate']} "
+                        f"<span style='float:right;font-size:22px;font-weight:800'>{g['score']:.0f}</span></div>",
+                        unsafe_allow_html=True,
+                    )
+
+        audit = st.session_state.get("gate_audit", [])
+        if audit:
+            st.divider()
+            st.markdown(f"**📋 Gate 결정 이력 ({len(audit)}건)**")
+            for entry in reversed(audit[-10:]):
+                icon = "🟢" if entry["gate"]=="Go" else "🟡" if entry["gate"]=="Hold" else "🔴"
+                st.caption(f"{entry['date']} {entry['ts']} | {entry['icon']} {entry['name']} | {icon} {entry['gate']} {entry['score']:.0f}점")
 
     with tab_record:
         c1, c2 = st.columns(2)
@@ -3685,6 +3750,14 @@ elif st.session_state.page == "reports":
         "R8_gov_ir":        ("🏛️", "R8 정부지원·IR 제출", "KIAT/KEIT 제출용"),
         "R9_sps":           ("🔍", "R9 선행기술조사(SPS)","신규성·진보성 분석"),
     }
+
+    # G9에서 넘어온 prefill 처리
+    _prefill = st.session_state.pop("_rpt_prefill", None)
+    if _prefill:
+        _prid   = _prefill.get("report_id", "")
+        _pname  = _REPORT_META_UI.get(_prid, ("📄", _prid, ""))[1]
+        st.markdown(f'<div class="ok-card">✅ G9에서 전달된 <b>{_pname}</b> 결과가 저장 탭에 표시됩니다.</div>', unsafe_allow_html=True)
+        st.session_state["_g9_prefill_saved"] = _prefill
 
     tab_pipe, tab_saved, tab_history = st.tabs([
         "⚡ 보고서 생성 파이프라인", "📂 저장된 보고서", "🕑 파이프라인 이력"
