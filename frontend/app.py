@@ -758,6 +758,8 @@ def render_context_banner():
         f'</div>',
         unsafe_allow_html=True,
     )
+    if trl and trl > 0:
+        render_trl_gauge(min(max(int(trl), 1), 9))
 
 
 def render_gate_card(gate: str, score: float, stage_label: str, next_actions: list[str]):
@@ -846,6 +848,132 @@ def _save_gate(stage_num: int, result: dict):
         "tech_id":  st.session_state.get("tech_id", ""),
         "tech_name":st.session_state.get("tech_name", ""),
     })
+
+
+def render_trl_gauge(trl: int, show_label: bool = True):
+    """TRL 1~9 시각화 게이지 (NASA/EU Horizon 기준)"""
+    TRL_LABELS = {
+        1: "기초 원리 관찰",   2: "기술 개념 정립",   3: "개념 실험 검증",
+        4: "연구실 규모 실증", 5: "관련 환경 실증",   6: "실 환경 데모",
+        7: "프로토타입 시연",  8: "시스템 완성·검증", 9: "임무 성공 실증",
+    }
+    TRL_PHASE = {(1,3): ("연구","#6366f1"), (4,6): ("개발","#3b82f6"), (7,9): ("상용화","#4ade80")}
+    phase_lbl, phase_col = "연구", "#6366f1"
+    for (lo, hi), (lbl, col) in TRL_PHASE.items():
+        if lo <= trl <= hi:
+            phase_lbl, phase_col = lbl, col
+
+    bars = ""
+    for i in range(1, 10):
+        filled = i <= trl
+        col = phase_col if filled else "rgba(255,255,255,.07)"
+        bars += (
+            f'<div style="flex:1;height:6px;background:{col};border-radius:2px;'
+            f'transition:background .2s" title="TRL {i}"></div>'
+        )
+    label_html = (
+        f'<div style="display:flex;justify-content:space-between;margin-top:4px">'
+        f'<span style="font-size:9px;color:#475569">TRL {trl}/9</span>'
+        f'<span style="font-size:9px;color:{phase_col};font-weight:700">{phase_lbl} 단계 — {TRL_LABELS.get(trl,"")}</span>'
+        f'</div>'
+    ) if show_label else ""
+    st.markdown(
+        f'<div style="margin:6px 0">'
+        f'<div style="display:flex;gap:3px">{bars}</div>'
+        f'{label_html}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_output_doc(doc: dict | list | str | None, title: str = "", collapsed: bool = False):
+    """API 출력 문서를 구조화된 카드로 렌더링 (st.json 대체)"""
+    if doc is None:
+        st.markdown('<div class="info-card">결과 없음</div>', unsafe_allow_html=True)
+        return
+    if isinstance(doc, str):
+        st.markdown(f'<div class="ok-card">{doc}</div>', unsafe_allow_html=True)
+        return
+    if isinstance(doc, list):
+        for i, item in enumerate(doc):
+            render_output_doc(item, title=f"항목 {i+1}")
+        return
+
+    # dict 처리
+    _SKIP = {"_version", "_source", "tech_id"}
+    _GATE_COLORS = {"Go": "#4ade80", "Hold": "#fbbf24", "Kill": "#f87171"}
+
+    def _tag(v: str, color: str = "#60a5fa") -> str:
+        return f'<span class="bm-tag" style="background:rgba(255,255,255,.05);color:{color};border-color:rgba(255,255,255,.1)">{v}</span>'
+
+    def _render_value(k: str, v):
+        """단일 키-값 렌더링"""
+        if k in _SKIP:
+            return
+        label = k.replace("_", " ").title()
+
+        # 게이트 판정
+        if k in ("gate", "Gate") and isinstance(v, str):
+            color = _GATE_COLORS.get(v, "#94a3b8")
+            st.markdown(
+                f'<div style="display:flex;align-items:center;gap:8px;margin:4px 0">'
+                f'<span style="font-size:10px;color:#475569;min-width:90px">{label}</span>'
+                f'<span class="bm-tag" style="background:rgba(255,255,255,.05);color:{color};'
+                f'border-color:{color};font-size:10px;font-weight:700">{v}</span></div>',
+                unsafe_allow_html=True,
+            )
+        # 숫자 점수
+        elif k in ("score", "pcml_score", "scr_score", "trl", "mrl") and isinstance(v, (int, float)):
+            col_a, col_b = st.columns([1, 3])
+            col_a.metric(label, f"{v:.1f}" if isinstance(v, float) else v)
+        # 리스트 → 태그 행
+        elif isinstance(v, list):
+            if not v:
+                return
+            tags = "".join(_tag(str(i)) for i in v[:8])
+            more = f'<span style="font-size:9px;color:#334155"> +{len(v)-8}개</span>' if len(v) > 8 else ""
+            st.markdown(
+                f'<div style="margin:4px 0">'
+                f'<div style="font-size:9px;color:#475569;font-weight:700;margin-bottom:3px">{label}</div>'
+                f'<div>{tags}{more}</div></div>',
+                unsafe_allow_html=True,
+            )
+        # 중첩 dict → expander
+        elif isinstance(v, dict):
+            with st.expander(f"📂 {label}", expanded=False):
+                render_output_doc(v)
+        # 긴 문자열 → caption
+        elif isinstance(v, str) and len(v) > 80:
+            st.markdown(
+                f'<div style="margin:4px 0">'
+                f'<div style="font-size:9px;color:#475569;font-weight:700;margin-bottom:2px">{label}</div>'
+                f'<div style="font-size:11px;color:#94a3b8;line-height:1.6">{v}</div></div>',
+                unsafe_allow_html=True,
+            )
+        # 짧은 값 → 인라인
+        else:
+            st.markdown(
+                f'<div style="display:flex;align-items:center;gap:8px;margin:3px 0">'
+                f'<span style="font-size:9px;color:#475569;min-width:90px">{label}</span>'
+                f'{_tag(str(v))}</div>',
+                unsafe_allow_html=True,
+            )
+
+    # 요약/설명 필드 우선 표시
+    priority_keys = ["summary", "description", "executive_summary", "conclusion",
+                     "gate", "Gate", "score", "pcml_score", "scr_score"]
+    shown = set()
+    for k in priority_keys:
+        if k in doc:
+            _render_value(k, doc[k])
+            shown.add(k)
+
+    # 나머지 필드
+    other_keys = [k for k in doc if k not in shown and k not in _SKIP]
+    if other_keys:
+        label_str = f"📋 {title} 상세" if title else "📋 전체 결과"
+        with st.expander(label_str, expanded=not collapsed):
+            for k in other_keys:
+                _render_value(k, doc[k])
 
 
 def render_pcml_chart(pcml_data: dict):
@@ -2638,7 +2766,7 @@ elif st.session_state.page in ("g1", "ip_hub"):  # ip_hub 하위호환
                                "next_actions": result.get("next_steps", [])})
 
                 with st.expander("전체 분석 결과 JSON"):
-                    st.json(result)
+                    render_output_doc(result, collapsed=True)
 
     with tab_extended:
         st.subheader("G1 PCML → G2 SCR → G3 시장성 통합 분석")
@@ -2711,7 +2839,7 @@ elif st.session_state.page in ("g1", "ip_hub"):  # ip_hub 하위호환
                 _save_gate(1, {"gate": ext_result.get('overall_gate',''), "score": scores.get('composite',0), "next_actions": next_steps})
 
                 with st.expander("전체 JSON"):
-                    st.json(ext_result)
+                    render_output_doc(ext_result, collapsed=True)
             else:
                 st.error("분석 실패 — API 서버를 확인하세요.")
 
@@ -2730,14 +2858,14 @@ elif st.session_state.page in ("g1", "ip_hub"):  # ip_hub 하위호환
             if result:
                 st.success("IP 전주기 분석 완료")
                 with st.expander("결과 보기"):
-                    st.json(result)
+                    render_output_doc(result, collapsed=True)
 
     with tab_fto:
         st.subheader("경쟁사·침해 모니터링")
         if st.button("▶ 경쟁사 동향 조회"):
             result = api_get(f"/result/{st.session_state.tech_id}")
             if result:
-                st.json(result)
+                render_output_doc(result)
             else:
                 st.info("아직 분석 결과가 없습니다. IP 전주기 분석을 먼저 실행하세요.")
 
@@ -2879,7 +3007,7 @@ elif st.session_state.page in ("g4", "interviews"):
             })
             if result:
                 with st.expander("📄 LoI 내용", expanded=True):
-                    st.json(result.get("loi_template", result))
+                    render_output_doc(result.get("loi_template", result), title="LoI 템플릿", collapsed=True)
 
 
 # ════════════════════════════════════════════════════════════════
@@ -2972,7 +3100,7 @@ elif st.session_state.page in ("g5", "bm"):  # bm 하위호환
                 if out.get("smk_triggered"):
                     st.success("✅ SMK(사업화시장키트) 자동 생성 완료")
                 with st.expander("전체 결과 JSON"):
-                    st.json(result)
+                    render_output_doc(result, collapsed=True)
 
     with tab_ue:
         st.subheader("Unit Economics 분석")
@@ -3001,7 +3129,7 @@ elif st.session_state.page in ("g5", "bm"):  # bm 하위호환
             })
             if r:
                 with st.expander("상세 분석 결과"):
-                    st.json(r)
+                    render_output_doc(r, collapsed=True)
 
     with tab_smk:
         st.subheader("🚀 SMK — 사업화시장키트 (S·M·K)")
@@ -3032,7 +3160,7 @@ elif st.session_state.page in ("g5", "bm"):  # bm 하위호환
                         st.markdown(f"**{label}**")
                         st.info(val if isinstance(val, str) else str(val))
                 with st.expander("전체 SMK JSON"):
-                    st.json(r)
+                    render_output_doc(r, collapsed=True)
 
     with tab_rm:
         st.subheader("🗺️ 실행 로드맵")
@@ -3056,7 +3184,7 @@ elif st.session_state.page in ("g5", "bm"):  # bm 하위호환
                     import pandas as pd
                     st.dataframe(pd.DataFrame(ms), use_container_width=True)
                 with st.expander("전체 JSON"):
-                    st.json(r)
+                    render_output_doc(r, collapsed=True)
 
 
 # ════════════════════════════════════════════════════════════════
@@ -3101,7 +3229,7 @@ elif st.session_state.page in ("g6", "valuation"):  # valuation 하위호환
             render_gate_card(result.get("gate",""), float(result.get("score",0)),
                              "G6 가치평가", result.get("next_actions",[]))
             with st.expander("상세 결과"):
-                st.json(result)
+                render_output_doc(result)
 
 
 # ════════════════════════════════════════════════════════════════
@@ -3463,7 +3591,7 @@ elif st.session_state.page == "g0":
                                                         "input_data": {"tech_description": idf_text}})
             if r:
                 st.success("✅ IDF 생성 완료")
-                st.json(r.get("output_doc", r))
+                render_output_doc(r.get("output_doc", r))
 
     with tab_demand:
         st.subheader("수요조사서 자동 생성")
@@ -3476,7 +3604,7 @@ elif st.session_state.page == "g0":
                                                                        "target_segment": ds_seg}})
             if r:
                 st.success("✅ 수요조사서 생성 완료")
-                st.json(r.get("output_doc", r))
+                render_output_doc(r.get("output_doc", r))
 
 
 # ════════════════════════════════════════════════════════════════
@@ -3510,7 +3638,7 @@ elif st.session_state.page == "g2":
                 st.metric("평가 TRL", f"TRL {trl_result}", f"자가진단 대비 {trl_result - trl_cur2:+d}")
                 render_gate_card(r.get("gate",""), float(r.get("score",0)), "G2 TRL 평가", r.get("next_actions",[]))
                 with st.expander("상세 결과"):
-                    st.json(r)
+                    render_output_doc(r, collapsed=True)
 
     with tab_scr:
         st.subheader("SCR — 신규성·진보성 스크리닝 (PQE-SCR v4.0)")
@@ -3539,7 +3667,7 @@ elif st.session_state.page == "g2":
                         st.info(w if isinstance(w, str) else str(w))
                 render_gate_card(r.get("gate",""), float(r.get("score",0)), "G2 SCR", r.get("next_actions",[]))
                 with st.expander("전체 SCR 결과"):
-                    st.json(r)
+                    render_output_doc(r, collapsed=True)
 
     with tab_pat:
         st.subheader("권리성 평가 (특허 등록 가능성)")
@@ -3550,7 +3678,7 @@ elif st.session_state.page == "g2":
                 r = api_post("/ip/patentability", {"patent_text": pat_text,
                                                    "tech_id": st.session_state.tech_id or "G2"})
             if r:
-                st.json(r.get("output_doc", r))
+                render_output_doc(r.get("output_doc", r))
 
 
 # ════════════════════════════════════════════════════════════════
@@ -3596,7 +3724,7 @@ elif st.session_state.page == "g3":
                 c3.metric("SOM", f"${out.get('som_usd_million', tam*0.01):,.0f}M")
                 render_gate_card(r.get("gate",""), float(r.get("score",0)), "G3 시장성", r.get("next_actions",[]))
                 with st.expander("상세 결과"):
-                    st.json(r)
+                    render_output_doc(r, collapsed=True)
 
     with tab_comp:
         st.subheader("경쟁사 분석 및 생태계 매핑")
@@ -3606,7 +3734,7 @@ elif st.session_state.page == "g3":
                 r = api_post("/gap/ecosystem-match", {"tech_id": st.session_state.tech_id or "G3",
                                                       "input_data": {"tech_description": comp_desc}})
             if r:
-                st.json(r.get("output_doc", r))
+                render_output_doc(r.get("output_doc", r))
 
     with tab_smk_mkt:
         st.subheader("SMK 시장분석부 — S(전략)·M(시장)·K(킬기준)")
@@ -3620,7 +3748,7 @@ elif st.session_state.page == "g3":
                                                              "tam_usd_million": smk_tam2}})
             if r:
                 st.success("✅ SMK 시장분석 완료")
-                st.json(r.get("output_doc", r))
+                render_output_doc(r.get("output_doc", r))
 
 
 # ════════════════════════════════════════════════════════════════
@@ -3657,7 +3785,7 @@ elif st.session_state.page == "g7":
             if r:
                 st.session_state["_poc_plan"] = r.get("output_doc", r)
                 st.success("✅ PoC 계획 생성 완료")
-                st.json(r.get("output_doc", r))
+                render_output_doc(r.get("output_doc", r))
 
     with tab_result:
         st.subheader("PoC 결과 등록 및 판정")
@@ -3757,7 +3885,7 @@ elif st.session_state.page == "g8":
                 r = api_post("/stage/8", {"tech_id": st.session_state.tech_id or "G8",
                                           "input_data": {"tech_description": mrl_text}})
             if r:
-                st.json(r.get("output_doc", r))
+                render_output_doc(r.get("output_doc", r))
 
     with tab_reg:
         st.subheader("규제·인증 경로 로드맵")
@@ -3769,7 +3897,7 @@ elif st.session_state.page == "g8":
                                                        "input_data": {"tech_description": reg_text,
                                                                       "region": reg_region2}})
             if r:
-                st.json(r.get("output_doc", r))
+                render_output_doc(r.get("output_doc", r))
 
     with tab_team:
         st.subheader("팀 역량 평가 (NSF I-Corps 5차원)")
@@ -3779,7 +3907,7 @@ elif st.session_state.page == "g8":
                 r = api_post("/execution/team", {"tech_id": st.session_state.tech_id or "G8",
                                                  "input_data": {"team_description": team_text}})
             if r:
-                st.json(r.get("output_doc", r))
+                render_output_doc(r.get("output_doc", r))
 
 
 # ════════════════════════════════════════════════════════════════
@@ -3812,7 +3940,7 @@ elif st.session_state.page == "g9":
                 _save_gate(9, r)
                 render_gate_card(r.get("gate",""), float(r.get("score",0)), "G9 거래·투자", r.get("next_actions",[]))
                 with st.expander("Deal 전략 상세"):
-                    st.json(r.get("output_doc", r))
+                    render_output_doc(r.get("output_doc", r))
 
     with tab_license:
         st.subheader("라이선싱·기술이전 전략")
@@ -3824,7 +3952,7 @@ elif st.session_state.page == "g9":
                                                          "input_data": {"tech_description": lic_text,
                                                                         "royalty_rate": lic_royalty / 100}})
             if r:
-                st.json(r.get("output_doc", r))
+                render_output_doc(r.get("output_doc", r))
 
     with tab_invest:
         st.subheader("투자유치 전략 (IR Deck 포함)")
@@ -3838,7 +3966,7 @@ elif st.session_state.page == "g9":
                                                              "investment_stage": inv_stage,
                                                              "target_amount_million_krw": inv_amt * 100}})
             if r:
-                st.json(r.get("output_doc", r))
+                render_output_doc(r.get("output_doc", r))
 
     with tab_exit:
         st.subheader("엑시트 전략 (M&A / IPO)")
@@ -3848,7 +3976,7 @@ elif st.session_state.page == "g9":
                 r = api_post("/gap/exit-strategy", {"tech_id": st.session_state.tech_id or "G9",
                                                     "input_data": {"tech_description": exit_text}})
             if r:
-                st.json(r.get("output_doc", r))
+                render_output_doc(r.get("output_doc", r))
 
 
 # ════════════════════════════════════════════════════════════════
@@ -3904,9 +4032,9 @@ elif st.session_state.page == "roadmap":
                     score = sdata.get("score",0)
                     icon  = "🟢" if gate=="Go" else "🟡" if gate=="Hold" else "🔴"
                     with st.expander(f"{icon} {sid} — {gate} ({score:.0f}점)"):
-                        st.json(sdata)
+                        render_output_doc(sdata, collapsed=True)
             else:
-                st.json(result)
+                render_output_doc(result)
 
 
 # ════════════════════════════════════════════════════════════════
@@ -3959,7 +4087,7 @@ elif st.session_state.page == "admin":
                 st.metric("상태", f"{icon} {status}")
                 if job.get("result"):
                     with st.expander("결과"):
-                        st.json(job["result"])
+                        render_output_doc(job["result"], collapsed=True)
                 if job.get("error"):
                     st.error(job["error"])
 
