@@ -9,3 +9,6 @@ venv/
 *.egg-info/
 dist/
 build/
+server.err
+st_err.txt
+st_out.txt
