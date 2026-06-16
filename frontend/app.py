@@ -647,6 +647,10 @@ _DEFAULTS = {
     "move_mode": None,          # 이동 대상 tech id
     "_active_proj": None,       # 선택된 프로젝트 필터
     "_show_new_proj": False,
+    "gate_audit": [],           # Audit Trail: [{stage, gate, score, ts, tech_id}]
+    "_ws_filter_gate": "전체",  # 워크스페이스 필터
+    "_ws_saved_views": [],      # 저장된 뷰 목록 [{name, filter_gate}]
+    "_ws_selected_stage": None, # 듀얼패널 선택 스테이지
 }
 for k, v in _DEFAULTS.items():
     if k not in st.session_state:
@@ -821,12 +825,27 @@ def render_quick_toolbar(current_stage: int):
 
 
 def _save_gate(stage_num: int, result: dict):
-    """Gate 결과를 세션에 저장"""
+    """Gate 결과를 세션에 저장 + Audit Trail 기록"""
+    import datetime as _dt
     gate  = result.get("gate", "")
     score = float(result.get("score", 0))
     st.session_state.stage_gates[stage_num] = {"gate": gate, "score": score}
     st.session_state.last_result = result
     st.session_state.last_stage  = stage_num
+    # Audit Trail
+    gid, name, icon = STAGE_META.get(stage_num, (f"G{stage_num}", "?", "?"))
+    st.session_state.gate_audit.append({
+        "ts":       _dt.datetime.now().strftime("%H:%M"),
+        "date":     _dt.datetime.now().strftime("%m/%d"),
+        "stage":    stage_num,
+        "gid":      gid,
+        "name":     name,
+        "icon":     icon,
+        "gate":     gate,
+        "score":    score,
+        "tech_id":  st.session_state.get("tech_id", ""),
+        "tech_name":st.session_state.get("tech_name", ""),
+    })
 
 
 def render_pcml_chart(pcml_data: dict):
@@ -2138,119 +2157,203 @@ elif st.session_state.page == "workspace":
     st.title("🏠 기술 워크스페이스")
     render_stage_bar()
 
-    st.divider()
-
-    # KPI 요약 (상단 4개)
-    c1, c2, c3, c4 = st.columns(4)
+    # ── KPI 요약 (상단 4개) ──────────────────────────────────────────
     completed = sum(1 for g in st.session_state.stage_gates.values() if g.get("gate") == "Go")
     kills     = sum(1 for g in st.session_state.stage_gates.values() if g.get("gate") == "Kill")
+    holds     = sum(1 for g in st.session_state.stage_gates.values() if g.get("gate") == "Hold")
     avg_score = (sum(g.get("score", 0) for g in st.session_state.stage_gates.values())
                  / max(len(st.session_state.stage_gates), 1))
     alerts_d  = api_get(f"/g10/kpi/{st.session_state.tech_id}/alerts", silent=True)
     alert_cnt = alerts_d.get("alert_count", 0) if alerts_d else 0
-    c1.metric("완료 단계", f"{completed}/11", "Go 판정")
-    c2.metric("평균 점수", f"{avg_score:.1f}", "0~100점")
-    c3.metric("Kill 단계", kills, "재검토 필요" if kills else "없음")
-    c4.metric("KPI 알림", alert_cnt, "🚨" if alert_cnt else "정상")
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("완료 단계", f"{completed}/11", "Go 판정")
+    k2.metric("평균 점수", f"{avg_score:.1f}", "0~100점")
+    k3.metric("Kill / Hold", f"{kills} / {holds}", "재검토 필요" if kills else ("보류 있음" if holds else "없음"))
+    k4.metric("KPI 알림", alert_cnt, "🚨" if alert_cnt else "정상")
 
     st.divider()
 
-    # 단계별 상태 카드
-    st.subheader("단계별 진행 현황")
-    cols = st.columns(4)
-    for n, (gid, name, icon) in STAGE_META.items():
-        info  = st.session_state.stage_gates.get(n, {})
-        gate  = info.get("gate", "미실행")
-        score = info.get("score", 0)
-        gate_icon = {"Go":"🟢","Hold":"🟡","Kill":"🔴","미실행":"⚪"}.get(gate,"⚪")
-        with cols[n % 4]:
-            st.markdown(
-                f"**{icon} {gid} {name}**  \n"
-                f"{gate_icon} {gate}"
-                + (f" · {score:.0f}점" if gate != "미실행" else ""),
+    # ── 필터 바 + Saved Views (Clarivate/Anaqua 스타일) ─────────────
+    frow1, frow2 = st.columns([3, 1])
+    with frow1:
+        f_opts = ["전체", "Go", "Hold", "Kill", "미실행"]
+        cur_f  = st.session_state.get("_ws_filter_gate", "전체")
+        sel_f  = st.radio("게이트 필터", f_opts, index=f_opts.index(cur_f),
+                          horizontal=True, key="ws_gate_filter_radio", label_visibility="collapsed")
+        st.session_state["_ws_filter_gate"] = sel_f
+    with frow2:
+        saved = st.session_state.get("_ws_saved_views", [])
+        sv_names = ["뷰 선택…"] + [v["name"] for v in saved]
+        sv_sel = st.selectbox("저장된 뷰", sv_names, key="ws_saved_view_sel", label_visibility="collapsed")
+        if sv_sel != "뷰 선택…":
+            matched = next((v for v in saved if v["name"] == sv_sel), None)
+            if matched:
+                st.session_state["_ws_filter_gate"] = matched["filter_gate"]
+                st.rerun()
+        if st.button("💾 현재 뷰 저장", key="ws_save_view"):
+            vname = f"필터:{sel_f}"
+            if not any(v["name"] == vname for v in saved):
+                saved.append({"name": vname, "filter_gate": sel_f})
+                st.session_state["_ws_saved_views"] = saved
+                st.success(f'뷰 "{vname}" 저장됨')
+
+    # ── 듀얼 패널 레이아웃 (Anaqua/Wellspring 스타일) ───────────────
+    left_col, right_col = st.columns([3, 2])
+
+    with left_col:
+        st.markdown('<div class="sec-header-v2">단계별 진행 현황</div>', unsafe_allow_html=True)
+        active_filter = st.session_state.get("_ws_filter_gate", "전체")
+        grid_cols = st.columns(3)
+        for n, (gid, name, icon) in STAGE_META.items():
+            info  = st.session_state.stage_gates.get(n, {})
+            gate  = info.get("gate", "미실행")
+            score = info.get("score", 0)
+            # 필터 적용
+            if active_filter != "전체" and gate != active_filter:
+                continue
+            gate_color = {"Go":"#4ade80","Hold":"#fbbf24","Kill":"#f87171","미실행":"#334155"}.get(gate,"#334155")
+            is_selected = st.session_state.get("_ws_selected_stage") == n
+            border_style = f"border:1px solid {gate_color};" + ("box-shadow:0 0 10px rgba(59,130,246,.3);" if is_selected else "")
+            html_card = (
+                f'<div class="bm-card" style="{border_style}cursor:pointer;min-height:70px">'
+                f'<div class="bm-card-hdr">'
+                f'<span style="font-size:16px">{icon}</span>'
+                f'<span class="bm-card-title">{gid} {name}</span>'
+                f'</div>'
+                f'<div style="display:flex;align-items:center;gap:6px">'
+                f'<span style="width:7px;height:7px;border-radius:50%;background:{gate_color};display:inline-block"></span>'
+                f'<span style="font-size:10px;color:{gate_color}">{gate}</span>'
+                + (f'<span class="bm-tag" style="margin-left:auto">{score:.0f}점</span>' if gate != "미실행" else "")
+                + f'</div></div>'
             )
+            with grid_cols[n % 3]:
+                st.markdown(html_card, unsafe_allow_html=True)
+                if st.button(f"{'▶' if not is_selected else '▼'} {gid}", key=f"ws_sel_{n}",
+                             use_container_width=True):
+                    st.session_state["_ws_selected_stage"] = None if is_selected else n
+                    st.rerun()
 
-    # 3단 파이프라인 빠른 실행 (G1→G2→G3)
-    st.divider()
-    with st.expander("⚡ G1→G2→G3 연속 분석 (특허→PCML→SCR→시장성)", expanded=False):
-        st.caption("특허 텍스트 하나로 G1 PCML · G2 SCR · G3 시장성을 한 번에 분석합니다.")
-        pipeline_text = st.text_area(
-            "특허 텍스트 또는 기술 설명",
-            value=st.session_state.get("home_text", ""),
-            height=120,
-            key="ws_pipeline_text",
-            placeholder="청구항 또는 기술 요약을 붙여넣으세요…",
-        )
-        c_tam, c_grow, c_mkt = st.columns(3)
-        ws_tam   = c_tam.number_input("TAM (USD)", value=500_000_000, step=100_000_000, format="%d", key="ws_tam")
-        ws_grow  = c_grow.number_input("성장률 (%)", value=8.0, step=1.0, key="ws_grow")
-        ws_mkt   = c_mkt.text_input("목표 시장", value="글로벌 B2B 기술 라이선싱", key="ws_mkt")
-        if st.button("🚀 3단 파이프라인 실행", type="primary", key="ws_chain_run"):
-            if not pipeline_text.strip():
-                st.warning("특허 텍스트를 입력하세요.")
-            else:
-                with st.spinner("G1 PCML → G2 SCR → G3 시장성 분석 중…"):
-                    resp = api_post("/ip/analyze-chain-extended", {
-                        "patent_text": pipeline_text,
-                        "tech_id": st.session_state.tech_id or "WS-CHAIN",
-                        "tech_name": st.session_state.tech_name or "분석 기술",
-                        "tam_usd": ws_tam,
-                        "growth_rate_pct": ws_grow,
-                        "target_market": ws_mkt,
-                    })
-                if resp:
-                    chain = resp.get("chain", {})
-                    scores = resp.get("pipeline_scores", {})
-                    sc1, sc2, sc3, sc4 = st.columns(4)
-                    sc1.metric("PCML (G1)", f"{scores.get('pcml',0):.0f}점", chain.get('step2_pcml',{}).get('gate',''))
-                    sc2.metric("SCR (G2)", f"{scores.get('scr',0):.0f}점", chain.get('step3_scr',{}).get('gate',''))
-                    sc3.metric("시장성 (G3)", f"{scores.get('g3',0):.0f}점", chain.get('step4_g3',{}).get('gate',''))
-                    sc4.metric("종합 점수", f"{scores.get('composite',0):.0f}점", resp.get('overall_gate',''))
-                    for stage_n, step_key in [(1,'step2_pcml'),(2,'step3_scr'),(3,'step4_g3')]:
-                        s = chain.get(step_key, {})
-                        if s.get('gate'):
-                            st.session_state.stage_gates[stage_n] = {
-                                "gate": s['gate'], "score": s['score']
-                            }
-                    st.session_state.last_result = {"gate": resp.get('overall_gate',''), "score": scores.get('composite',0), "next_actions": resp.get('next_steps',[])}
-                    st.session_state.last_stage  = 3
-                    next_steps = resp.get("next_steps", [])
-                    if next_steps:
-                        st.markdown("**권장 다음 단계:**")
-                        for ns in next_steps[:3]:
-                            st.markdown(f"- {ns}")
+        # 3단 파이프라인 빠른 실행
+        st.divider()
+        with st.expander("⚡ G1→G2→G3 연속 분석", expanded=False):
+            st.caption("특허 텍스트 하나로 G1 PCML · G2 SCR · G3 시장성을 한 번에 분석합니다.")
+            pipeline_text = st.text_area("특허 텍스트 또는 기술 설명",
+                value=st.session_state.get("home_text", ""), height=110,
+                key="ws_pipeline_text", placeholder="청구항 또는 기술 요약을 붙여넣으세요…")
+            c_tam, c_grow = st.columns(2)
+            ws_tam  = c_tam.number_input("TAM (USD)", value=500_000_000, step=100_000_000, format="%d", key="ws_tam")
+            ws_grow = c_grow.number_input("성장률 (%)", value=8.0, step=1.0, key="ws_grow")
+            ws_mkt  = st.text_input("목표 시장", value="글로벌 B2B 기술 라이선싱", key="ws_mkt")
+            if st.button("🚀 3단 파이프라인 실행", type="primary", key="ws_chain_run"):
+                if not pipeline_text.strip():
+                    st.warning("특허 텍스트를 입력하세요.")
                 else:
-                    st.error("파이프라인 실행 실패 — API 서버 상태를 확인하세요.")
+                    with st.spinner("G1 PCML → G2 SCR → G3 시장성 분석 중…"):
+                        resp = api_post("/ip/analyze-chain-extended", {
+                            "patent_text": pipeline_text,
+                            "tech_id": st.session_state.tech_id or "WS-CHAIN",
+                            "tech_name": st.session_state.tech_name or "분석 기술",
+                            "tam_usd": ws_tam,
+                            "growth_rate_pct": ws_grow,
+                            "target_market": ws_mkt,
+                        })
+                    if resp:
+                        chain = resp.get("chain", {})
+                        scores = resp.get("pipeline_scores", {})
+                        sc1, sc2, sc3, sc4 = st.columns(4)
+                        sc1.metric("PCML (G1)", f"{scores.get('pcml',0):.0f}점", chain.get('step2_pcml',{}).get('gate',''))
+                        sc2.metric("SCR (G2)",  f"{scores.get('scr',0):.0f}점",  chain.get('step3_scr',{}).get('gate',''))
+                        sc3.metric("시장성 (G3)",f"{scores.get('g3',0):.0f}점",  chain.get('step4_g3',{}).get('gate',''))
+                        sc4.metric("종합 점수", f"{scores.get('composite',0):.0f}점", resp.get('overall_gate',''))
+                        for stage_n, step_key in [(1,'step2_pcml'),(2,'step3_scr'),(3,'step4_g3')]:
+                            s = chain.get(step_key, {})
+                            if s.get('gate'):
+                                _save_gate(stage_n, s)
+                        st.session_state.last_result = {"gate": resp.get('overall_gate',''), "score": scores.get('composite',0), "next_actions": resp.get('next_steps',[])}
+                        st.session_state.last_stage  = 3
+                        for ns in resp.get("next_steps", [])[:3]:
+                            st.markdown(f"- {ns}")
+                    else:
+                        st.error("파이프라인 실행 실패 — API 서버 상태를 확인하세요.")
 
-    # 마지막 결과 Gate 카드
-    if st.session_state.last_result and st.session_state.last_stage is not None:
+    with right_col:
+        sel_stage = st.session_state.get("_ws_selected_stage")
+        if sel_stage is not None:
+            # ── 상세 패널 (선택된 스테이지) ──────────────────
+            gid, sname, sicon = STAGE_META[sel_stage]
+            info  = st.session_state.stage_gates.get(sel_stage, {})
+            gate  = info.get("gate", "미실행")
+            score = info.get("score", 0)
+            gate_color = {"Go":"#4ade80","Hold":"#fbbf24","Kill":"#f87171"}.get(gate,"#475569")
+
+            st.markdown(f'<div class="sec-header-v2">{sicon} {gid} — {sname} 상세</div>', unsafe_allow_html=True)
+            if gate != "미실행":
+                render_gate_card(gate=gate, score=score, stage_label=f"{gid} {sname}", next_actions=[])
+            else:
+                st.markdown('<div class="info-card">아직 분석이 실행되지 않았습니다.</div>', unsafe_allow_html=True)
+
+            # 해당 스테이지 이동 버튼
+            if st.button(f"▶ {gid} {sname} 열기", type="primary", key=f"ws_open_{sel_stage}", use_container_width=True):
+                st.session_state.page = f"g{sel_stage}"
+                st.rerun()
+
+            # Gate → 다음 단계
+            if gate == "Go" and sel_stage < 10:
+                next_n = sel_stage + 1
+                ng, nn, ni = STAGE_META[next_n]
+                if st.button(f"▶ {ni} {ng} {nn} 시작", key=f"ws_next_{sel_stage}", use_container_width=True):
+                    st.session_state.page = f"g{next_n}"
+                    st.rerun()
+            elif gate == "Kill":
+                if st.button("🔄 G0 재진입 (Pivot)", key=f"ws_pivot_{sel_stage}", use_container_width=True):
+                    st.session_state.page = "g0"; st.rerun()
+
+        else:
+            # ── Audit Trail 패널 ─────────────────────────────
+            st.markdown('<div class="sec-header-v2">활동 타임라인 (Audit Trail)</div>', unsafe_allow_html=True)
+            audit = list(reversed(st.session_state.gate_audit))
+            if not audit:
+                st.markdown('<div class="info-card">Gate 분석을 실행하면 여기에 이력이 기록됩니다.</div>', unsafe_allow_html=True)
+            else:
+                for entry in audit[:15]:
+                    g = entry.get("gate","")
+                    col = {"Go":"#4ade80","Hold":"#fbbf24","Kill":"#f87171"}.get(g,"#475569")
+                    st.markdown(
+                        f'<div style="display:flex;gap:10px;align-items:flex-start;'
+                        f'padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)">'
+                        f'<div style="min-width:38px;text-align:right;font-size:9px;color:#334155;padding-top:2px">'
+                        f'{entry["date"]}<br>{entry["ts"]}</div>'
+                        f'<div style="width:2px;background:{col};border-radius:2px;align-self:stretch;flex-shrink:0"></div>'
+                        f'<div>'
+                        f'<div style="font-size:11px;font-weight:600;color:#cbd5e1">'
+                        f'{entry["icon"]} {entry["gid"]} {entry["name"]}</div>'
+                        f'<div style="font-size:10px;color:{col};margin-top:2px">'
+                        f'{g} · {entry["score"]:.0f}점</div>'
+                        f'<div style="font-size:9px;color:#334155;margin-top:1px">{entry.get("tech_name","")}</div>'
+                        f'</div></div>',
+                        unsafe_allow_html=True,
+                    )
+
+    # 마지막 결과 Gate 카드 (워크스페이스 하단, 패널 미선택 시)
+    if st.session_state.last_result and st.session_state.last_stage is not None \
+            and st.session_state.get("_ws_selected_stage") is None:
         st.divider()
         r  = st.session_state.last_result
         sn = st.session_state.last_stage
         gid, name, _ = STAGE_META.get(sn, ("G?", "?", "?"))
-        render_gate_card(
-            gate=r.get("gate",""),
-            score=float(r.get("score",0)),
-            stage_label=f"{gid} {name}",
-            next_actions=r.get("next_actions",[]),
-        )
-
-        # Gate → 다음 단계 버튼
+        render_gate_card(gate=r.get("gate",""), score=float(r.get("score",0)),
+                         stage_label=f"{gid} {name}", next_actions=r.get("next_actions",[]))
         gate = r.get("gate","")
         if gate == "Go" and sn < 10:
             next_n = sn + 1
-            next_name = STAGE_META[next_n][1]
-            if st.button(f"▶ {STAGE_META[next_n][2]} G{next_n} {next_name} 시작", type="primary"):
-                st.session_state.page = f"g{next_n}"
-                st.rerun()
+            if st.button(f"▶ {STAGE_META[next_n][2]} G{next_n} {STAGE_META[next_n][1]} 시작", type="primary", key="ws_last_next"):
+                st.session_state.page = f"g{next_n}"; st.rerun()
         elif gate == "Kill":
-            col_a, col_b = st.columns(2)
-            if col_a.button("🔄 G0 재진입 (Pivot)"):
-                st.session_state.page = "g0"
-                st.rerun()
-            if col_b.button("📄 IP 라이선싱 검토"):
-                st.session_state.page = "g1"
-                st.rerun()
+            ca, cb = st.columns(2)
+            if ca.button("🔄 G0 재진입 (Pivot)", key="ws_pivot_last"):
+                st.session_state.page = "g0"; st.rerun()
+            if cb.button("📄 IP 라이선싱 검토", key="ws_lic_last"):
+                st.session_state.page = "g1"; st.rerun()
 
 
 # ════════════════════════════════════════════════════════════════
