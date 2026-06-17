@@ -384,8 +384,19 @@ def run_pcml_analysis(req: PCMLRequest, _: dict = Depends(require_auth)):
         "analysis_limits":   out.get("analysis_limits", []),
         "next_actions":      out.get("next_actions", result.next_actions),
         # ── v2 호환 (screening_agent 등이 claim_graph_layer 참조) ──
-        "claim_graph_layer": out.get("claim_graph_layer") or
-                             out.get("tech_graph_layer", {}),
+        "claim_graph_layer": {
+            "dependency_tree": {},
+            "essential_requirement_set": [],
+            **(out.get("claim_graph_layer") or out.get("tech_graph_layer") or {}),
+        },
+        # ── patent_layer v2 alias (tests / 외부 클라이언트 호환) ──
+        "patent_layer": out.get("patent_layer") or {
+            **(out.get("metadata_layer") or {}),
+            "input_mode": req.input_mode or "full_spec",
+            "patent_id": req.patent_id or req.tech_id or "",
+            "jurisdiction": (out.get("metadata_layer") or {}).get("jurisdiction", "KR"),
+            "language": (out.get("metadata_layer") or {}).get("language", "ko"),
+        },
         # ── KPI 연계 & 요약 ────────────────
         "kpi_inputs": kpi_inputs,
         "summary": out.get("_part_a_summary") or out.get("_summary", ""),
@@ -1300,7 +1311,10 @@ def analyze_chain(req: _ChainRequest, _: dict = Depends(require_auth)):
                 "gate":        pcml_result_sr.gate,
                 "score":       pcml_result_sr.score,
                 "qc_grade":    pcml_out.get("qc", {}).get("qc_grade", ""),
-                "core_nodes":  pcml_out.get("shared_variables", {}).get("self_core_nodes", 0),
+                "core_nodes":  pcml_out.get("shared_variables", {}).get("self_core_nodes") or
+                               sum(pcml_out.get("shared_variables", {}).get(k, 0)
+                                   for k in ("tech_core_nodes","market_core_nodes",
+                                             "business_core_nodes","regulatory_core_nodes")),
                 "release_status": pcml_out.get("governance", {}).get("release_status", ""),
                 "kpi_inputs":  kpi_inputs,
             },
@@ -1451,7 +1465,10 @@ def analyze_chain_extended(req: _ChainExtRequest, _: dict = Depends(require_auth
                 "gate": pcml_sr.gate,
                 "score": pcml_sr.score,
                 "qc_grade": pcml_out.get("qc", {}).get("qc_grade", ""),
-                "core_nodes": pcml_out.get("shared_variables", {}).get("self_core_nodes", 0),
+                "core_nodes": pcml_out.get("shared_variables", {}).get("self_core_nodes") or
+                              sum(pcml_out.get("shared_variables", {}).get(k, 0)
+                                  for k in ("tech_core_nodes","market_core_nodes",
+                                            "business_core_nodes","regulatory_core_nodes")),
                 "release_status": pcml_out.get("governance", {}).get("release_status", ""),
                 "kpi_inputs": kpi_inputs,
             },

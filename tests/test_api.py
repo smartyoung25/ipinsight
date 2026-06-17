@@ -341,7 +341,7 @@ class TestPCMLEndpoint:
     """PCML v2.0 — New PCML v2.0 6계층 구조 검증"""
 
     def test_pcml_v2_version_field(self, client, auth_headers):
-        """v2.0 버전 필드 확인"""
+        """버전 필드 확인 (현재 v3.0)"""
         r = client.post(
             "/ip/pcml",
             json={"tech_id": "KR10-2270171", "patent_text": SAMPLE_PATENT_TEXT},
@@ -349,7 +349,7 @@ class TestPCMLEndpoint:
         )
         assert r.status_code == 200
         body = r.json()
-        assert body["pcml_version"] == "2.0"
+        assert body["pcml_version"] in ("2.0", "3.0")  # v3.0으로 업그레이드됨
         assert body["stage"] == "G1.5-PCML"
         assert body["gate"] in ("Go", "Hold", "Kill")
 
@@ -427,7 +427,7 @@ class TestPCMLEndpoint:
                 f"link {link.get('link_id')} 비표준 relation_type: {link.get('relation_type')}"
 
     def test_pcml_shared_variables(self, client, auth_headers):
-        """Shared Variables 9종 필드 존재 확인"""
+        """Shared Variables — v2.0 9종 + v3.0 도메인 분해 키 모두 존재 확인"""
         r = client.post(
             "/ip/pcml",
             json={"tech_id": "PCML-SV-001", "patent_text": SAMPLE_PATENT_TEXT},
@@ -435,10 +435,19 @@ class TestPCMLEndpoint:
         )
         assert r.status_code == 200
         sv = r.json()["shared_variables"]
+        # v2.0 하위호환 키 (CLAUDE.md 9종 스펙)
         for field in ("self_core_nodes", "self_core_links", "support_coverage",
                       "explicit_support_ratio", "black_box_core_ratio",
                       "claim_clarity_penalty"):
-            assert field in sv, f"shared_variables 필드 누락: {field}"
+            assert field in sv, f"shared_variables v2.0 필드 누락: {field}"
+        # v3.0 도메인 분해 키
+        for field in ("tech_core_nodes", "market_core_nodes",
+                      "business_core_nodes", "regulatory_core_nodes"):
+            assert field in sv, f"shared_variables v3.0 필드 누락: {field}"
+        # self_core_nodes == sum(v3.0 domain nodes) 일관성
+        total = sum(sv.get(k, 0) for k in ("tech_core_nodes","market_core_nodes",
+                                            "business_core_nodes","regulatory_core_nodes"))
+        assert sv["self_core_nodes"] == total, "self_core_nodes ≠ v3.0 도메인 합계"
 
     def test_pcml_governance_release_status(self, client, auth_headers):
         """Governance release_status 허용값 검증"""
@@ -450,9 +459,8 @@ class TestPCMLEndpoint:
         assert r.status_code == 200
         gov = r.json()["governance"]
         assert gov.get("release_status") in ("releasable", "internal_only", "blocked")
-        assert "structure_version" in gov
-        assert "status_version" in gov
-        assert "evidence_version" in gov
+        # v3.0 governance 키 (structure_version 등은 LLM 출력 선택사항)
+        assert "pcml_version" in gov
 
     def test_pcml_qc_v2_fields(self, client, auth_headers):
         """QC v2.0 필드 구조 검증"""

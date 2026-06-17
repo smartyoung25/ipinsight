@@ -774,6 +774,7 @@ def _rule_fallback_v3(text: str, doc_id: str | None, input_mode: str) -> dict:
         "legal_family_layer": {"legal_events": [], "family": []},
         "evidence_layer": [],
         "shared_variables": {
+            # v3.0 도메인별 분해 키
             "tech_core_nodes": len(core_tech),
             "market_core_nodes": 0,
             "business_core_nodes": 0,
@@ -782,6 +783,16 @@ def _rule_fallback_v3(text: str, doc_id: str | None, input_mode: str) -> dict:
             "overall_trl": None,
             "market_attractiveness": None,
             "regulatory_risk": None,
+            # v2.0 하위 호환 키 (CLAUDE.md 9종 스펙 유지)
+            "self_core_nodes": len(core_tech),
+            "self_core_links": 0,
+            "support_coverage": 0.0,
+            "explicit_support_ratio": 0.0,
+            "evidence_linkage_ratio": 0.0,
+            "black_box_core_ratio": 0.5,
+            "claim_clarity_penalty": 0,
+            "legal_status_score": 0.5,
+            "family_coverage_rate": 0.0,
         },
         "governance": {
             "pcml_version": "3.0",
@@ -833,6 +844,29 @@ def _extract_json_from_llm(text: str) -> dict:
     if start != -1 and end != -1:
         return json.loads(text[start:end + 1])
     raise ValueError("JSON 블록 미발견")
+
+
+def _ensure_v2_compat_sv(data: dict) -> None:
+    """LLM 출력 shared_variables에 v2.0 하위호환 키 보장 (in-place).
+    CLAUDE.md 9종 스펙: self_core_nodes, self_core_links, support_coverage,
+    explicit_support_ratio, evidence_linkage_ratio, black_box_core_ratio,
+    claim_clarity_penalty, legal_status_score, family_coverage_rate
+    """
+    sv = data.setdefault("shared_variables", {})
+    if "self_core_nodes" not in sv:
+        sv["self_core_nodes"] = (
+            sv.get("tech_core_nodes", 0) + sv.get("market_core_nodes", 0)
+            + sv.get("business_core_nodes", 0) + sv.get("regulatory_core_nodes", 0)
+        )
+    if "self_core_links" not in sv:
+        sv["self_core_links"] = sv.get("cross_domain_links_count", 0)
+    for key, default in (
+        ("support_coverage", 0.0), ("explicit_support_ratio", 0.0),
+        ("evidence_linkage_ratio", 0.0), ("black_box_core_ratio", 0.5),
+        ("claim_clarity_penalty", 0), ("legal_status_score", 0.5),
+        ("family_coverage_rate", 0.0),
+    ):
+        sv.setdefault(key, default)
 
 
 def _validate_and_repair(data: dict) -> dict:
@@ -992,6 +1026,7 @@ class PCMLAgent(BaseAgent):
             data = _extract_json_from_llm(raw)
             data["_part_a_summary"] = part_a
             data = _validate_and_repair(data)
+            _ensure_v2_compat_sv(data)
             return data
 
         except json.JSONDecodeError as e:
@@ -1047,8 +1082,10 @@ class PCMLAgent(BaseAgent):
             if n.get("element_class") == "Core"
         ][:5]
 
+        total_core = tech_core + market_core + biz_core + reg_core
         return {
             "ip_strength_score": ip_strength,
+            "core_node_count": total_core,           # 하위호환 통합 카운트
             "tech_core_nodes": tech_core,
             "market_core_nodes": market_core,
             "business_core_nodes": biz_core,
@@ -1065,4 +1102,5 @@ class PCMLAgent(BaseAgent):
             "doc_id": tgl.get("doc_id"),
             "tech_field": tgl.get("tech_field", ""),
             "keywords": tech_keywords,
+            "trl": sv.get("overall_trl"),
         }

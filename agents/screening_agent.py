@@ -141,7 +141,9 @@ def _rule_fallback_screening(pcml_data: dict) -> dict:
     shared = pcml_data.get("shared_variables", {})
     patent_layer = pcml_data.get("patent_layer", {})
 
-    core_nodes = int(shared.get("self_core_nodes") or 0)
+    core_nodes = int(shared.get("self_core_nodes") or
+                     shared.get("tech_core_nodes", 0) + shared.get("market_core_nodes", 0)
+                     + shared.get("business_core_nodes", 0) + shared.get("regulatory_core_nodes", 0))
     # 모든 비율 값은 0.0~1.0 범위로 클램핑 (LLM이 0~100 스케일로 반환할 수 있음)
     def _clamp01(v, default):
         if v is None:
