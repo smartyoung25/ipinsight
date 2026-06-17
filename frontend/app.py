@@ -658,6 +658,10 @@ _DEFAULTS = {
     "_bulk_action": None,
     # AI Agent Governance
     "_agent_log": [],           # [{ts, endpoint, params_preview, result_summary, approved}]
+    # G3 시장성 분석 결과 캐시 (G5 자동인계용)
+    "_g3_tam_result": None,
+    "_g3_sam_result": None,
+    "_g3_som_result": None,
     # G6 방법론별 결과 캐시
     "_g6_dcf_result": None,
     "_g6_cca_result": None,
@@ -4207,6 +4211,50 @@ elif st.session_state.page == "g3":
             region_g3 = st.selectbox("목표 국가", ["KOR","USA","EU","JPN","CHN"], key="g3_region")
         tech_desc_g3 = st.text_area("기술/제품 설명", height=80, key="g3_desc",
                                     placeholder="예) AI 기반 작물 생장 예측 SaaS...")
+
+        # ── 인터랙티브 퍼널 + 성장 전망 차트 (입력값 즉시 반영) ──────────
+        import plotly.graph_objects as go
+        _tam_v = float(tam)
+        _sam_v = float(st.session_state.get("_g3_sam_result", _tam_v * 0.1))
+        _som_v = float(st.session_state.get("_g3_som_result", _tam_v * 0.01))
+        # tam 값이 바뀌면 저장된 비율을 유지하되 절대값 재계산
+        _stored_tam = st.session_state.get("_g3_tam_result", _tam_v)
+        if _stored_tam and _stored_tam != _tam_v:
+            _ratio_sam = _sam_v / _stored_tam if _stored_tam else 0.1
+            _ratio_som = _som_v / _stored_tam if _stored_tam else 0.01
+            _sam_v = _tam_v * _ratio_sam
+            _som_v = _tam_v * _ratio_som
+
+        col_ch1, col_ch2 = st.columns(2)
+        with col_ch1:
+            fig_f = go.Figure(go.Funnel(
+                y=["TAM (전체시장)", "SAM (접근가능)", "SOM (획득가능)"],
+                x=[_tam_v, _sam_v, _som_v],
+                texttemplate=[f"${_tam_v:,.0f}M", f"${_sam_v:,.0f}M ({_sam_v/_tam_v*100:.1f}%)",
+                               f"${_som_v:,.0f}M ({_som_v/_tam_v*100:.1f}%)"] if _tam_v else ["","",""],
+                textinfo="text",
+                marker_color=["#6366f1","#8b5cf6","#a78bfa"],
+                connector={"line": {"color":"rgba(99,102,241,.3)","width":1}},
+            ))
+            fig_f.update_layout(margin=dict(l=0,r=0,t=28,b=0), height=220,
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                font_color="#e2e8f0", title=dict(text="시장 퍼널", font=dict(size=13)))
+            st.plotly_chart(fig_f, use_container_width=True)
+
+        with col_ch2:
+            _yrs = [str(2025+i) for i in range(5)]
+            _vals = [_tam_v * ((1+growth/100)**i) for i in range(5)]
+            fig_g = go.Figure(go.Bar(
+                x=_yrs, y=_vals,
+                marker_color=["#6366f1","#7c3aed","#8b5cf6","#a78bfa","#c4b5fd"],
+                text=[f"${v:,.0f}M" for v in _vals], textposition="outside",
+            ))
+            fig_g.update_layout(margin=dict(l=0,r=0,t=28,b=0), height=220,
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                font_color="#e2e8f0", yaxis_visible=False,
+                title=dict(text=f"TAM 5년 전망 (CAGR {growth:.1f}%)", font=dict(size=13)))
+            st.plotly_chart(fig_g, use_container_width=True)
+
         if st.button("🌐 시장성 분석 실행", type="primary", disabled=not tech_desc_g3.strip()):
             with st.spinner("시장성 분석 중..."):
                 r = api_post("/stage/3", {
@@ -4218,13 +4266,19 @@ elif st.session_state.page == "g3":
             if r:
                 _save_gate(3, r)
                 out = r.get("output_doc", {})
+                _sam_api = float(out.get("sam_usd_million", _tam_v * 0.1))
+                _som_api = float(out.get("som_usd_million", _tam_v * 0.01))
+                st.session_state["_g3_tam_result"] = _tam_v
+                st.session_state["_g3_sam_result"] = _sam_api
+                st.session_state["_g3_som_result"] = _som_api
                 c1, c2, c3 = st.columns(3)
-                c1.metric("TAM", f"${out.get('tam_usd_million', tam):,.0f}M")
-                c2.metric("SAM", f"${out.get('sam_usd_million', tam*0.1):,.0f}M")
-                c3.metric("SOM", f"${out.get('som_usd_million', tam*0.01):,.0f}M")
+                c1.metric("TAM", f"${_tam_v:,.0f}M")
+                c2.metric("SAM", f"${_sam_api:,.0f}M", delta=f"{_sam_api/_tam_v*100:.1f}% of TAM" if _tam_v else None)
+                c3.metric("SOM", f"${_som_api:,.0f}M", delta=f"{_som_api/_tam_v*100:.1f}% of TAM" if _tam_v else None)
                 render_gate_card(r.get("gate",""), float(r.get("score",0)), "G3 시장성", r.get("next_actions",[]))
                 with st.expander("상세 결과"):
                     render_output_doc(r, collapsed=True)
+                st.rerun()  # 퍼널 차트 즉시 갱신
 
     with tab_comp:
         st.subheader("경쟁사 분석 및 생태계 매핑")
