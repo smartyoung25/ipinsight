@@ -459,6 +459,48 @@ def list_runs(tech_id: str = "", _: dict = Depends(require_auth)):
     return list_pipeline_runs(tech_id or None)
 
 
+@router.get("/history", summary="보고서·파이프라인 통합 이력 (최신순)")
+def get_history(tech_id: str = "", limit: int = 50, _: dict = Depends(require_auth)):
+    """pipeline_runs + reports를 통합하여 최신순으로 반환.
+    각 항목에 type='pipeline_run' 또는 type='report' 포함.
+    """
+    runs = list_pipeline_runs(tech_id or None)
+    reps = list_reports(tech_id or None)
+    items = []
+    for r in runs:
+        items.append({
+            "type": "pipeline_run",
+            "id": r["id"],
+            "tech_id": r["tech_id"],
+            "tech_name": r.get("tech_name", ""),
+            "status": r.get("status", ""),
+            "created_at": r["created_at"],
+            "summary": {
+                "trl": r.get("trl"),
+                "reports_generated": r.get("reports_generated", "[]"),
+                "pcml_score": (r.get("store_a") and __import__("json").loads(r["store_a"]) or {}).get("pcml_score"),
+                "scr_gate": (r.get("store_b") and __import__("json").loads(r["store_b"]) or {}).get("gate"),
+            },
+        })
+    for r in reps:
+        items.append({
+            "type": "report",
+            "id": r["id"],
+            "tech_id": r["tech_id"],
+            "report_id": r.get("report_id", ""),
+            "tier": r.get("tier", ""),
+            "status": r.get("status", ""),
+            "created_at": r["created_at"],
+            "summary": {
+                "pcml_score": r.get("pcml_score"),
+                "scr_score": r.get("scr_score"),
+                "key_findings_count": len(__import__("json").loads(r["key_findings"] or "[]")),
+            },
+        })
+    items.sort(key=lambda x: x["created_at"], reverse=True)
+    return {"items": items[:limit], "total": len(items)}
+
+
 @router.get("/recommend", summary="입력 기반 보고서 추천")
 def recommend(
     pcml_score: float = 50, scr_score: float = 50,

@@ -1487,6 +1487,25 @@ def analyze_chain_extended(req: _ChainExtRequest, _: dict = Depends(require_auth
         "warnings": pcml_sr.warnings + scr_sr.warnings,
         "consistency_check": _check_pcml_scr_consistency(pcml_sr, scr_sr),
     }
+    # ── chain 결과 DB 영속화 ──────────────────────────────────────
+    try:
+        from api.services.report_pipeline import save_pipeline_run
+        save_pipeline_run(
+            tech_id=tech_id,
+            tech_name=tech_name,
+            input_text=patent_text[:500],
+            trl=int(kpi_inputs.get("trl", 4)),
+            store_a={"pcml_score": pcml_sr.score, "gate": pcml_sr.gate,
+                     "qc_grade": pcml_out.get("qc", {}).get("qc_grade", ""),
+                     "release_status": pcml_out.get("governance", {}).get("release_status", "")},
+            store_b={"scr_score": scr_sr.score, "gate": scr_sr.gate,
+                     "novelty": scr_out.get("noveltyAnalysis", {}).get("status", ""),
+                     "g3_gate": g3_sr.gate, "g3_score": g3_sr.score,
+                     "tam_usd": tam, "sam_usd": sam, "som_usd": som},
+            reports=gate_routing.get("recommendedReports", []),
+        )
+    except Exception:
+        pass  # DB 저장 실패는 응답 실패로 이어지지 않음
 
 
 @app.post(
