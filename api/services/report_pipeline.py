@@ -199,11 +199,15 @@ def recommend_reports(store_a: dict, store_b: dict, trl: int) -> list[dict]:
 
 # ── LLM 보고서 생성 ─────────────────────────────────────────────
 
-def _build_prompt(report_id: str, tier: str, store_a: dict, store_b: dict, store_d: dict) -> str:
+def _build_prompt(report_id: str, tier: str, store_a: dict, store_b: dict, store_d: dict,
+                  compacted_deps: dict | None = None) -> str:
     from api.routers.reports import _REPORT_ROLES, _REPORT_DESCRIPTIONS
     role = _REPORT_ROLES.get(report_id, "IPInsight 보고서 분석가")
     desc = _REPORT_DESCRIPTIONS.get(report_id, "")
     tier_txt = {"FULL": "FULL (전체)", "LITE": "LITE (요약)", "FREE": "FREE (핵심만)"}.get(tier, tier)
+    dep_block = ""
+    if compacted_deps:
+        dep_block = f"\n[의존 보고서 요약 (참고용)]\n{json.dumps(compacted_deps, ensure_ascii=False, indent=2)}\n"
     return f"""[ROLE] {role}
 
 [보고서] {REPORT_META.get(report_id, {}).get('label', report_id)} — {tier_txt}
@@ -219,7 +223,7 @@ def _build_prompt(report_id: str, tier: str, store_a: dict, store_b: dict, store
 
 [사용자 컨텍스트 (StoreD)]
 {json.dumps(store_d, ensure_ascii=False, indent=2)}
-
+{dep_block}
 [출력 형식] JSON:
 {{
   "reportId": "string",
@@ -231,6 +235,74 @@ def _build_prompt(report_id: str, tier: str, store_a: dict, store_b: dict, store
 
 [절대 금지] 원문에 없는 수치 생성 / 근거 없는 결론 / N/A 대신 숫자 꾸미기
 """
+
+
+# ── StoreA 강제 인계 (hallucination 방지) ────────────────────────────
+# JS ip-insight 의 enrichR{N}FromStoreA 패턴 이식.
+# LLM이 빈 배열을 내거나 임의 해석해도 PCML 결과로 덮어쓴다.
+
+def _enrich_from_store_a(report_id: str, result: dict, store_a: dict) -> dict:
+    """LLM 출력의 청구항/구성요소 필드를 StoreA PCML 값으로 강제 덮어쓰기."""
+    claims = store_a.get("independent_claims") or []
+    components = store_a.get("components") or []
+    ipc_codes = store_a.get("ipc_codes") or []
+
+    sd = result.setdefault("structuredData", {})
+
+    # 모든 보고서: patentBasicInfo, 핵심 청구항, 구성요소 맵 보장
+    sd["patentBasicInfo"] = {
+        "ipcCodes":    ipc_codes,
+        "pcmlScore":   store_a.get("pcml_score", 0),
+        "releaseStatus": store_a.get("release_status", "internal_only"),
+    }
+    # 청구항·구성요소: LLM 출력이 빈 리스트면 StoreA 값으로 교체
+    if not sd.get("claims"):
+        sd["claims"] = claims
+    if not sd.get("components"):
+        sd["components"] = components
+
+    # R5: 가치평가 필드가 비면 TRL·PCML 점수 기반 최소 블록 주입
+    if report_id == "R5_valuation":
+        trl = (result.get("structuredData") or {}).get("trl") or 0
+        if not sd.get("valuationBlock"):
+            sd["valuationBlock"] = {
+                "trl": trl,
+                "pcml_score": store_a.get("pcml_score", 0),
+                "note": "LLM 미산출 — PCML 점수 기준 최소값",
+            }
+
+    # R6: R5 의존 재무 블록 보장
+    if report_id == "R6_ir" and not sd.get("r5Summary"):
+        sd["r5Summary"] = {"note": "R5 미생성 또는 비어있음 — R5 먼저 생성 권장"}
+
+    # R7: R5·R2 keyFindings 헤더 주입
+    if report_id == "R7_license":
+        strengths = store_a.get("strengths") or []
+        if strengths and not sd.get("pcmlStrengths"):
+            sd["pcmlStrengths"] = strengths[:3]
+
+    return result
+
+
+# ── 의존 보고서 컴팩션 (token 절감) ──────────────────────────────────
+# JS ip-insight 의 compactDependencies 패턴 이식.
+# Tier-2/3 보고서 생성 시 선행 보고서 전체를 넘기지 않고 핵심만 축약.
+
+def _compact_dep_reports(dep_reports: dict) -> dict:
+    """의존 보고서 → keyFindings + 핵심 structuredData 블록만 추출."""
+    compacted: dict = {}
+    for rid, content in (dep_reports or {}).items():
+        if not isinstance(content, dict):
+            continue
+        compacted[rid] = {
+            "keyFindings": (content.get("keyFindings") or [])[:5],
+            "valuationBlock": (content.get("structuredData") or {}).get("valuationBlock"),
+            "gate": (content.get("structuredData") or {}).get("gate"),
+            "pcmlScore": (content.get("structuredData") or {}).get("patentBasicInfo", {}).get("pcmlScore"),
+        }
+        # None 필드 제거 (Firestore 패턴과 동일 — undefined 없애기)
+        compacted[rid] = {k: v for k, v in compacted[rid].items() if v is not None}
+    return compacted
 
 
 def generate_report_content(
@@ -250,6 +322,7 @@ def generate_report_content(
     groq_key = os.environ.get("GROQ_API_KEY", "")
 
     result = {}
+    compacted_deps = _compact_dep_reports(dep_reports)
 
     # Anthropic 우선 시도 (크레딧 오류 시 즉시 Groq로 넘어감)
     if api_key:
@@ -258,7 +331,7 @@ def generate_report_content(
             client = anthropic.Anthropic(api_key=api_key)
             # LITE는 haiku(빠름/저렴), FULL은 sonnet
             model = "claude-haiku-4-5-20251001" if tier in ("FREE","LITE") else "claude-sonnet-4-6"
-            prompt = _build_prompt(report_id, tier, store_a, store_b, store_d)
+            prompt = _build_prompt(report_id, tier, store_a, store_b, store_d, compacted_deps)
             msg = client.messages.create(
                 model=model, max_tokens=6000,
                 messages=[{"role": "user", "content": prompt}],
@@ -283,7 +356,7 @@ def generate_report_content(
         try:
             from groq import Groq
             client = Groq(api_key=groq_key)
-            prompt = _build_prompt(report_id, tier, store_a, store_b, store_d)
+            prompt = _build_prompt(report_id, tier, store_a, store_b, store_d, compacted_deps)
             # LITE/FREE는 작은 모델(토큰 절약), FULL은 70b
             model = "llama-3.1-8b-instant" if tier in ("FREE","LITE") else "llama-3.3-70b-versatile"
             resp = client.chat.completions.create(
@@ -327,6 +400,9 @@ def generate_report_content(
             "structuredData": {},
             "_fallback": True,
         }
+
+    # StoreA 강제 인계 — LLM 출력의 청구항/구성요소 필드를 PCML 결과로 덮어쓰기
+    result = _enrich_from_store_a(report_id, result, store_a)
 
     return result
 

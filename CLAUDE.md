@@ -105,6 +105,15 @@ C:\IPinsight\
 | G4 LoI | loi_count≥1 or poc_requests≥1 시 도입의향서 자동생성 |
 | SMK | G5 Go 게이트 시 G3+G4+G5 통합 SMK 자동생성 |
 
+## 보고서 생성 안전장치 (JS ip-insight 패턴 이식)
+
+| 패턴 | 함수 | 설명 |
+|------|------|------|
+| StoreA 강제 인계 | `_enrich_from_store_a(report_id, result, store_a)` | LLM이 청구항/구성요소를 비우거나 환각해도 PCML 결과로 강제 덮어씀 |
+| 의존 보고서 컴팩션 | `_compact_dep_reports(dep_reports)` | R6→R5, R7→R5+R2 의존 시 전체 보고서 대신 keyFindings + 핵심 블록만 전달 (토큰 절감) |
+
+**수정 시 주의**: `_enrich_from_store_a` 를 변경하면 `structuredData.claims`/`.components` 필드가 사라질 수 있음. 반드시 R1~R9 전체 출력 콘솔 검증.
+
 ## 코딩 규칙 (절대 준수)
 
 - 모든 에이전트 메서드: `.assess(input_data: dict)` (`.run()` 아님)
