@@ -853,6 +853,9 @@ def _ensure_v2_compat_sv(data: dict) -> None:
     claim_clarity_penalty, legal_status_score, family_coverage_rate
     """
     sv = data.setdefault("shared_variables", {})
+    # v3.0 도메인 분해 키 기본값 먼저 설정 (Groq 부하 시 누락 방지)
+    for key in ("tech_core_nodes", "market_core_nodes", "business_core_nodes", "regulatory_core_nodes"):
+        sv.setdefault(key, 0)
     if "self_core_nodes" not in sv:
         sv["self_core_nodes"] = (
             sv.get("tech_core_nodes", 0) + sv.get("market_core_nodes", 0)
