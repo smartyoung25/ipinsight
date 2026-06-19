@@ -1370,6 +1370,7 @@ def analyze_chain(req: _ChainRequest, _: dict = Depends(require_auth)):
                     h for h in scr_out.get("scrReport", {}).get("hardStops", [])
                     if h.get("detected")
                 ],
+                "pqe_score_breakdown": gate_routing.get("pqeScoreBreakdown", {}),
             },
         },
         "overall_gate":          gate,

@@ -281,6 +281,24 @@ def _enrich_from_store_a(report_id: str, result: dict, store_a: dict) -> dict:
         if strengths and not sd.get("pcmlStrengths"):
             sd["pcmlStrengths"] = strengths[:3]
 
+    # 전 보고서: PQE 점수 근거 블록 보장 (고객 설명·반박 대응용)
+    if not sd.get("pqeScoreBreakdown"):
+        breakdown = store_a.get("pqe_score_breakdown") or {}
+        if not breakdown:
+            # StoreA에 breakdown 없으면 PCML 값으로 최소 구성
+            pcml_score = store_a.get("pcml_score", 0)
+            sv = store_a.get("shared_variables") or {}
+            core_nodes = int(sv.get("self_core_nodes") or
+                             sv.get("tech_core_nodes", 0) + sv.get("market_core_nodes", 0)
+                             + sv.get("business_core_nodes", 0) + sv.get("regulatory_core_nodes", 0))
+            breakdown = {
+                "total": pcml_score,
+                "core_nodes": {"contrib": min(int(core_nodes / max(core_nodes, 8) * 30), 30), "label": f"핵심 노드 {core_nodes}개"},
+                "grade": "Go" if pcml_score >= 65 else "Hold" if pcml_score >= 40 else "Kill",
+                "_source": "pcml_fallback",
+            }
+        sd["pqeScoreBreakdown"] = breakdown
+
     return result
 
 
