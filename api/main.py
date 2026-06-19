@@ -62,6 +62,7 @@ from agents import (
 )
 from pipeline.roadmap_builder import build_roadmap
 from api.routers.reports import router as reports_router
+from api.routers.payments import router as payments_router
 
 app = FastAPI(
     title="IPInsight IP Lifecycle × 글로벌 기술사업화 OS",
@@ -87,6 +88,7 @@ app.add_middleware(
 # FastAPI 미들웨어는 역순 실행 (마지막 등록이 첫 번째 실행)
 # 로깅을 먼저 등록 → 인증 게이트를 나중 등록 → 인증이 로깅보다 먼저 실행
 app.include_router(reports_router)
+app.include_router(payments_router)
 
 app.middleware("http")(logging_middleware)
 app.middleware("http")(post_auth_gate)
