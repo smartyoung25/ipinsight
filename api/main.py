@@ -34,7 +34,7 @@ def _load_dotenv():
 
 _load_dotenv()
 
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Request
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Request, UploadFile
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -1210,6 +1210,46 @@ def assess_g10(req: StageRequest, _: dict = Depends(require_auth)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"tech_id": req.tech_id, "stage": "G10", "result": result.to_dict()}
+
+
+# ── 파일 업로드 → 텍스트 추출 ───────────────────────────────────
+
+@app.post("/ip/upload-patent", tags=["IP 자동체인"], summary="특허 파일 업로드 (PDF/HWP/HWPX/DOCX/TXT)")
+async def upload_patent_file(
+    file: "UploadFile",
+    _: dict = Depends(require_auth),
+):
+    """특허 문서 파일을 업로드해 텍스트를 추출한 뒤 analyze-chain에 넘길 patent_text를 반환.
+
+    지원 형식: PDF, HWP, HWPX, DOCX, TXT
+    반환: { patent_text, quality, char_count, warnings }
+    """
+    from api.services.file_parser import parse_file, quality_check, SUPPORTED_EXTENSIONS
+    from pathlib import Path as _Path
+
+    ext = _Path(file.filename or "").suffix.lower()
+    if ext not in SUPPORTED_EXTENSIONS:
+        raise HTTPException(
+            status_code=415,
+            detail=f"지원하지 않는 파일 형식: '{ext}'. 지원: {', '.join(sorted(SUPPORTED_EXTENSIONS))}",
+        )
+
+    MAX_SIZE = 20 * 1024 * 1024  # 20 MB
+    content = await file.read()
+    if len(content) > MAX_SIZE:
+        raise HTTPException(status_code=413, detail=f"파일 크기 초과 (최대 20 MB, 업로드: {len(content)//1024} KB)")
+
+    try:
+        text = parse_file(file.filename, content)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    quality = quality_check(text)
+    return {
+        "patent_text": text,
+        "filename": file.filename,
+        **quality,
+    }
 
 
 # ── 특허→PCML→SCR 자동 체인 ──────────────────────────────────
