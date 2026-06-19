@@ -90,6 +90,7 @@ class BaseAgent:
                 msg = self._llm_client.messages.create(
                     model="claude-haiku-4-5-20251001",
                     max_tokens=2048,
+                    temperature=0,
                     system=sys_msg,
                     messages=[{"role": "user", "content": prompt}],
                 )
@@ -98,6 +99,8 @@ class BaseAgent:
                 resp = self._llm_client.chat.completions.create(
                     model="llama-3.1-8b-instant",
                     max_tokens=2048,
+                    temperature=0,
+                    seed=42,
                     messages=[
                         {"role": "system", "content": sys_msg},
                         {"role": "user", "content": prompt},

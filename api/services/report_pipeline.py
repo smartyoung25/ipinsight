@@ -284,6 +284,44 @@ def _enrich_from_store_a(report_id: str, result: dict, store_a: dict) -> dict:
     return result
 
 
+# ── 보고서 수치 일관성 교차검증 ─────────────────────────────────────────
+
+def _validate_numeric_consistency(report_id: str, result: dict, store_a: dict) -> list[str]:
+    """보고서 수치와 PCML StoreA 값의 일관성을 검사하고 경고 목록 반환."""
+    warnings: list[str] = []
+    sd = result.get("structuredData") or {}
+    pbi = sd.get("patentBasicInfo") or {}
+
+    # PQE ↔ PCML 점수: ±10점 허용
+    pqe = sd.get("pqeScore") or sd.get("gate", {}).get("score") if isinstance(sd.get("gate"), dict) else None
+    pcml = pbi.get("pcmlScore") or store_a.get("pcml_score")
+    if pqe is not None and pcml is not None:
+        try:
+            diff = abs(float(pqe) - float(pcml))
+            if diff > 10:
+                warnings.append(f"[수치불일치] PQE점수({pqe}) ↔ PCML점수({pcml}) 차이 {diff:.1f}점 초과")
+        except (TypeError, ValueError):
+            pass
+
+    # 청구항 수 일치 여부
+    report_claims = sd.get("claims") or []
+    store_claims = store_a.get("independent_claims") or []
+    if report_claims and store_claims and len(report_claims) != len(store_claims):
+        warnings.append(
+            f"[청구항수 불일치] 보고서={len(report_claims)}건, PCML={len(store_claims)}건"
+        )
+
+    # 구성요소 수: 보고서가 StoreA보다 현저히 많으면 환각 의심
+    report_comps = sd.get("components") or []
+    store_comps = store_a.get("components") or []
+    if store_comps and len(report_comps) > len(store_comps) * 2:
+        warnings.append(
+            f"[구성요소 과다] 보고서={len(report_comps)}건 vs PCML={len(store_comps)}건 — 환각 가능성"
+        )
+
+    return warnings
+
+
 # ── 의존 보고서 컴팩션 (token 절감) ──────────────────────────────────
 # JS ip-insight 의 compactDependencies 패턴 이식.
 # Tier-2/3 보고서 생성 시 선행 보고서 전체를 넘기지 않고 핵심만 축약.
@@ -334,6 +372,7 @@ def generate_report_content(
             prompt = _build_prompt(report_id, tier, store_a, store_b, store_d, compacted_deps)
             msg = client.messages.create(
                 model=model, max_tokens=6000,
+                temperature=0,
                 messages=[{"role": "user", "content": prompt}],
             )
             raw = msg.content[0].text.strip()
@@ -363,7 +402,8 @@ def generate_report_content(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=4000,
-                temperature=0.3,
+                temperature=0,
+                seed=42,
             )
             raw = resp.choices[0].message.content.strip()
             m = re.search(r"```(?:json)?\s*(\{[\s\S]+?\})\s*```", raw)
@@ -378,7 +418,29 @@ def generate_report_content(
         except Exception as e:
             err_str = str(e)
             if "429" in err_str or "rate" in err_str.lower():
-                log.warning("Groq 한도 초과 (오늘 토큰 소진) — 내일/1시간 후 재시도: %s", err_str[:150])
+                import time
+                log.warning("Groq 429 — 지수 백오프 재시도 (최대 2회): %s", err_str[:100])
+                for delay in (10, 30):
+                    try:
+                        time.sleep(delay)
+                        resp = client.chat.completions.create(
+                            model=model,
+                            messages=[{"role": "user", "content": prompt}],
+                            max_tokens=4000,
+                            temperature=0,
+                            seed=42,
+                        )
+                        raw = resp.choices[0].message.content.strip()
+                        m = re.search(r"```(?:json)?\s*(\{[\s\S]+?\})\s*```", raw)
+                        if not m:
+                            m = re.search(r"\{[\s\S]+\}", raw)
+                        if m:
+                            json_str = m.group(1) if m.lastindex else m.group()
+                            result = json.loads(json_str)
+                            result["_llm"] = f"groq/{model}"
+                        break
+                    except Exception as retry_e:
+                        log.warning("Groq 재시도(%ds) 실패: %s", delay, retry_e)
             else:
                 log.error("Groq 오류: %s", err_str[:300])
 
@@ -403,6 +465,13 @@ def generate_report_content(
 
     # StoreA 강제 인계 — LLM 출력의 청구항/구성요소 필드를 PCML 결과로 덮어쓰기
     result = _enrich_from_store_a(report_id, result, store_a)
+
+    # 수치 일관성 교차검증 — 경고를 보고서에 포함
+    consistency_warnings = _validate_numeric_consistency(report_id, result, store_a)
+    if consistency_warnings:
+        import logging
+        logging.getLogger(__name__).warning("수치 불일치 감지 [%s]: %s", report_id, consistency_warnings)
+        result.setdefault("_warnings", []).extend(consistency_warnings)
 
     return result
 

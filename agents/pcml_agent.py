@@ -992,10 +992,91 @@ class PCMLAgent(BaseAgent):
             warnings=warnings,
         )
 
+    # ── 슬라이딩 윈도우 청킹 ─────────────────────────────────────
+    _CHUNK_CHARS = 12000   # 청크당 최대 문자 수 (~3,000 토큰)
+    _OVERLAP_CHARS = 1500  # 청크 간 오버랩 (문맥 연속성)
+    _CHUNK_THRESHOLD = 14000  # 이 이상이면 청킹 분석 적용
+
+    def _split_chunks(self, text: str) -> list[str]:
+        """긴 특허 텍스트를 오버랩 포함 청크로 분할."""
+        if len(text) <= self._CHUNK_THRESHOLD:
+            return [text]
+        chunks = []
+        start = 0
+        while start < len(text):
+            end = start + self._CHUNK_CHARS
+            chunks.append(text[start:end])
+            if end >= len(text):
+                break
+            start = end - self._OVERLAP_CHARS
+        return chunks
+
+    def _merge_pcml_chunks(self, results: list[dict]) -> dict:
+        """청크별 PCML 결과를 병합 — 노드/링크/청구항 합집합, 점수 평균."""
+        if not results:
+            return {}
+        if len(results) == 1:
+            return results[0]
+
+        base = results[0]
+        seen_nodes: dict[str, set] = {
+            "technology": set(), "market": set(), "business": set(), "regulatory": set()
+        }
+
+        def _node_key(n: dict) -> str:
+            return n.get("normalized_label") or n.get("label", "")
+
+        for domain in ("technology", "market", "business", "regulatory"):
+            key = f"{domain}_graph"
+            base_nodes = base.get(key, {}).get("nodes", [])
+            for n in base_nodes:
+                seen_nodes[domain].add(_node_key(n))
+
+        for chunk_result in results[1:]:
+            for domain in ("technology", "market", "business", "regulatory"):
+                key = f"{domain}_graph"
+                src = chunk_result.get(key, {})
+                dst = base.setdefault(key, {})
+                # 노드 병합 (중복 제거)
+                for n in src.get("nodes", []):
+                    k = _node_key(n)
+                    if k and k not in seen_nodes[domain]:
+                        seen_nodes[domain].add(k)
+                        dst.setdefault("nodes", []).append(n)
+                # 링크 병합 (단순 추가)
+                for lnk in src.get("links", []):
+                    dst.setdefault("links", []).append(lnk)
+            # 청구항 병합
+            for cl in chunk_result.get("claims", {}).get("independent_claims", []):
+                if not any(c.get("claim_no") == cl.get("claim_no")
+                           for c in base.get("claims", {}).get("independent_claims", [])):
+                    base.setdefault("claims", {}).setdefault("independent_claims", []).append(cl)
+
+        # QC 점수: 청크 평균
+        scores = [r.get("qc", {}).get("qc_confidence", 50) for r in results]
+        base.setdefault("qc", {})["qc_confidence"] = round(sum(scores) / len(scores), 1)
+        base["qc"]["chunk_count"] = len(results)
+
+        _ensure_v2_compat_sv(base)
+        return base
+
     def _run_pcml_v3(self, text: str, doc_id: str | None, input_mode: str) -> dict:
         if self._llm_client is None:
             return _rule_fallback_v3(text, doc_id, input_mode)
 
+        # 긴 특허: 슬라이딩 윈도우 청킹
+        chunks = self._split_chunks(text)
+        if len(chunks) > 1:
+            chunk_results = []
+            for i, chunk in enumerate(chunks):
+                chunk_doc_id = f"{doc_id}_chunk{i+1}" if doc_id else f"chunk{i+1}"
+                chunk_results.append(self._run_pcml_v3_single(chunk, chunk_doc_id, input_mode))
+            return self._merge_pcml_chunks(chunk_results)
+
+        return self._run_pcml_v3_single(text, doc_id, input_mode)
+
+    def _run_pcml_v3_single(self, text: str, doc_id: str | None, input_mode: str) -> dict:
+        """단일 청크 PCML 분석 (청킹 없이 직접 호출)."""
         prompt = _build_v2_prompt(text, doc_id, input_mode)
         try:
             backend = getattr(self, "_llm_backend", "anthropic")
@@ -1003,6 +1084,7 @@ class PCMLAgent(BaseAgent):
                 msg = self._llm_client.messages.create(
                     model="claude-haiku-4-5-20251001",
                     max_tokens=16000,
+                    temperature=0,
                     system=_PCML_SYSTEM,
                     messages=[{"role": "user", "content": prompt}],
                 )
@@ -1011,6 +1093,8 @@ class PCMLAgent(BaseAgent):
                 resp = self._llm_client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
                     max_tokens=6000,
+                    temperature=0,
+                    seed=42,
                     messages=[
                         {"role": "system", "content": _PCML_SYSTEM},
                         {"role": "user", "content": prompt},
