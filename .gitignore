@@ -12,3 +12,7 @@ build/
 server.err
 st_err.txt
 st_out.txt
+.rag_cache/
+data/kpi_store.db
+data/payments.db
+data/credits.db

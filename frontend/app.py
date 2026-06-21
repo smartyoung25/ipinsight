@@ -4212,8 +4212,9 @@ elif st.session_state.page == "g3":
         tech_desc_g3 = st.text_area("기술/제품 설명", height=80, key="g3_desc",
                                     placeholder="예) AI 기반 작물 생장 예측 SaaS...")
 
-        # ── 인터랙티브 퍼널 + 성장 전망 차트 (입력값 즉시 반영) ──────────
+        # ── 인터랙티브 퍼널 + 파이 + 성장 전망 차트 (입력값 즉시 반영) ──
         import plotly.graph_objects as go
+        import plotly.express as px
         _tam_v = float(tam)
         _sam_v = float(st.session_state.get("_g3_sam_result", _tam_v * 0.1))
         _som_v = float(st.session_state.get("_g3_som_result", _tam_v * 0.01))
@@ -4225,7 +4226,7 @@ elif st.session_state.page == "g3":
             _sam_v = _tam_v * _ratio_sam
             _som_v = _tam_v * _ratio_som
 
-        col_ch1, col_ch2 = st.columns(2)
+        col_ch1, col_ch2, col_ch3 = st.columns(3)
         with col_ch1:
             fig_f = go.Figure(go.Funnel(
                 y=["TAM (전체시장)", "SAM (접근가능)", "SOM (획득가능)"],
@@ -4236,12 +4237,32 @@ elif st.session_state.page == "g3":
                 marker_color=["#6366f1","#8b5cf6","#a78bfa"],
                 connector={"line": {"color":"rgba(99,102,241,.3)","width":1}},
             ))
-            fig_f.update_layout(margin=dict(l=0,r=0,t=28,b=0), height=220,
+            fig_f.update_layout(margin=dict(l=0,r=0,t=28,b=0), height=240,
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                 font_color="#e2e8f0", title=dict(text="시장 퍼널", font=dict(size=13)))
             st.plotly_chart(fig_f, use_container_width=True)
 
         with col_ch2:
+            _pie_labels = ["TAM", "SAM", "SOM"]
+            _pie_vals   = [_tam_v, _sam_v, _som_v]
+            fig_p = px.pie(
+                names=_pie_labels, values=_pie_vals,
+                color_discrete_sequence=["#6366f1","#8b5cf6","#a78bfa"],
+                hole=0.45,
+            )
+            fig_p.update_traces(
+                texttemplate="%{label}<br>$%{value:,.0f}M",
+                textposition="inside", textfont_size=11,
+            )
+            fig_p.update_layout(
+                margin=dict(l=0,r=0,t=28,b=0), height=240,
+                paper_bgcolor="rgba(0,0,0,0)",
+                font_color="#e2e8f0", showlegend=False,
+                title=dict(text="TAM / SAM / SOM 비율", font=dict(size=13)),
+            )
+            st.plotly_chart(fig_p, use_container_width=True)
+
+        with col_ch3:
             _yrs = [str(2025+i) for i in range(5)]
             _vals = [_tam_v * ((1+growth/100)**i) for i in range(5)]
             fig_g = go.Figure(go.Bar(
@@ -4249,7 +4270,7 @@ elif st.session_state.page == "g3":
                 marker_color=["#6366f1","#7c3aed","#8b5cf6","#a78bfa","#c4b5fd"],
                 text=[f"${v:,.0f}M" for v in _vals], textposition="outside",
             ))
-            fig_g.update_layout(margin=dict(l=0,r=0,t=28,b=0), height=220,
+            fig_g.update_layout(margin=dict(l=0,r=0,t=28,b=0), height=240,
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                 font_color="#e2e8f0", yaxis_visible=False,
                 title=dict(text=f"TAM 5년 전망 (CAGR {growth:.1f}%)", font=dict(size=13)))

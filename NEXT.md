@@ -1,16 +1,16 @@
 # NEXT — 다음 세션 시작점
-> 생성: 2026-06-16 / 마지막 커밋: b6db9c2 (G10 gate map + REPORTS prefill)
+> 생성: 2026-06-16 / 마지막 커밋: 68694b4
 
 ## 현재 상태 (1줄)
-MECE 구조화 완료(G0~G10 단일 route 키, 좀비 alias 제거) + HOME 기술사업화 명언 순환 + 테스트 221개.
+G3 탭 TAM/SAM/SOM 3차트(퍼널·파이도넛·막대) 완료 + G3→G5 성장률 자동인계 안정화 확인.
 
 ## 이번 세션 목표 (1개만)
-[ ] G3 시장성 TAM/SAM/SOM 인터랙티브 Plotly 차트 + G3→G5 성장률 자동인계 안정화
+[x] G3 시장성 TAM/SAM/SOM 인터랙티브 Plotly 차트 + G3→G5 성장률 자동인계 안정화
 
 ## 다음 3개 작업 (우선순위 순)
-1. G3 시장성 — TAM/SAM/SOM Plotly 파이·막대 차트 시각화 (`frontend/app.py` G3 탭)
-2. 보고서 영속화 — SQLite에 chain 결과 저장 + `/reports/history` 엔드포인트
-3. FTO 보고서 자동생성 — G1 탭에 FTO 결과 → R3 보고서 다운로드 버튼
+1. 보고서 영속화 — SQLite에 chain 결과 저장 + `/reports/history` 엔드포인트
+2. FTO 보고서 자동생성 — G1 탭에 FTO 결과 → R3 보고서 다운로드 버튼
+3. G6 가치평가 — DCF 파라미터 슬라이더 + 민감도 분석 Plotly 차트
 
 ## 열린 문제 / 블로커
 - KIPRIS_API_KEY 미설정 → patent_text 직접 입력 우회 가능
